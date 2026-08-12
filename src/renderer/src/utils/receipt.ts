@@ -65,7 +65,7 @@ td{font-size:10px}
   <div class="title">${data.title}</div>
   ${data.invoiceNumber ? `<div class="info"><span>شماره: ${data.invoiceNumber}</span></div>` : ''}
   <div class="info"><span>تاریخ: ${data.date}</span></div>
-  ${data.cashier ? `<div class="info"><span>صندوک‌دار: ${data.cashier}</span></div>` : ''}
+  ${data.cashier ? `<div class="info"><span>صندوق‌دار: ${data.cashier}</span></div>` : ''}
   ${data.customer ? `<div class="info"><span>مشتری: ${data.customer}</span></div>` : ''}
   ${data.method ? `<div class="info"><span>نحوه پرداخت: ${data.method}</span></div>` : ''}
 

@@ -108,7 +108,7 @@ export default function BestSellingReport() {
                 <div className="flex-1 h-4 rounded-full overflow-hidden" style={{ backgroundColor: isDark ? '#0f172a' : '#f1f5f9' }}>
                   <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: COLORS[i % COLORS.length], opacity: 0.85 }} />
                 </div>
-                <span className="text-xs font-mono font-bold w-20 text-left" style={{ color: tPri }}>{formatPriceComma(r.totalRevenue)}</span>
+                <span className="text-xs font-mono font-bold w-20 text-left" style={{ fontFamily: "'Vazirmatn'" ,color: tPri }}>{formatPriceComma(r.totalRevenue)}</span>
                 <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ color: r.unitsSold > r.prevUnitsSold ? '#22c55e' : r.unitsSold < r.prevUnitsSold ? '#ef4444' : tSec, backgroundColor: r.unitsSold > r.prevUnitsSold ? 'rgba(34,197,94,0.1)' : r.unitsSold < r.prevUnitsSold ? 'rgba(239,68,68,0.1)' : 'transparent' }}>
                   {r.unitsSold > r.prevUnitsSold ? '↑' : r.unitsSold < r.prevUnitsSold ? '↓' : '—'} {Math.abs(r.unitsSold - r.prevUnitsSold)}
                 </span>
@@ -136,15 +136,15 @@ export default function BestSellingReport() {
               const changePercent = r.prevUnitsSold > 0 ? ((r.unitsSold - r.prevUnitsSold) / r.prevUnitsSold) * 100 : r.unitsSold > 0 ? 100 : 0
               return (
                 <tr key={r.productId} style={{ borderTop: `1px solid ${cardBorder}` }}>
-                  <td className="px-3 py-2 text-center font-bold" style={{ color: r.rank <= 3 ? COLORS[r.rank - 1] : tSec }}>{r.rank}</td>
-                  <td className="px-3 py-2 font-bold" style={{ color: tPri }}>{r.productTitle}</td>
-                  <td className="px-3 py-2" style={{ color: tSec }}>{r.category}</td>
-                  <td className="px-3 py-2 text-center font-mono" style={{ color: tPri }}>{r.unitsSold.toLocaleString('fa-IR')}</td>
-                  <td className="px-3 py-2 text-center font-mono" style={{ color: tSec }}>{r.prevUnitsSold.toLocaleString('fa-IR')}</td>
-                  <td className="px-3 py-2 text-left font-mono" style={{ color: '#22c55e' }}>{formatPriceComma(r.totalRevenue)}</td>
-                  <td className="px-3 py-2 text-left font-mono" style={{ color: tSec }}>{formatPriceFA(r.avgPrice)}</td>
+                  <td className="px-3 py-2 text-center font-bold" style={{fontFamily: "'Vazirmatn'" , color: r.rank <= 3 ? COLORS[r.rank - 1] : tSec }}>{r.rank}</td>
+                  <td className="px-3 py-2 font-bold" style={{ fontFamily: "'Vazirmatn'" ,color: tPri }}>{r.productTitle}</td>
+                  <td className="px-3 py-2" style={{ fontFamily: "'Vazirmatn'" ,color: tSec }}>{r.category}</td>
+                  <td className="px-3 py-2 text-center font-mono" style={{ fontFamily: "'Vazirmatn'" ,color: tPri }}>{r.unitsSold.toLocaleString('fa-IR')}</td>
+                  <td className="px-3 py-2 text-center font-mono" style={{ fontFamily: "'Vazirmatn'" ,color: tSec }}>{r.prevUnitsSold.toLocaleString('fa-IR')}</td>
+                  <td className="px-3 py-2 text-left font-mono" style={{ fontFamily: "'Vazirmatn'" ,color: '#22c55e' }}>{formatPriceComma(r.totalRevenue)}</td>
+                  <td className="px-3 py-2 text-left font-mono"  style={{ fontFamily: "'Vazirmatn'" ,color: tSec }}>{formatPriceFA(r.avgPrice)}</td>
                   <td className="px-3 py-2 text-center">
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ color: changePercent > 0 ? '#22c55e' : changePercent < 0 ? '#ef4444' : tSec, backgroundColor: changePercent > 0 ? 'rgba(34,197,94,0.1)' : changePercent < 0 ? 'rgba(239,68,68,0.1)' : 'transparent' }}>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ fontFamily: "'Vazirmatn'" ,color: changePercent > 0 ? '#22c55e' : changePercent < 0 ? '#ef4444' : tSec, backgroundColor: changePercent > 0 ? 'rgba(34,197,94,0.1)' : changePercent < 0 ? 'rgba(239,68,68,0.1)' : 'transparent' }}>
                       {changePercent > 0 ? '+' : ''}{changePercent.toFixed(1)}%
                     </span>
                   </td>

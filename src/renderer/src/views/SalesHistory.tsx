@@ -150,7 +150,7 @@ export default function SalesHistory() {
     const colMap: Record<string, { header: string; cell: (s: any) => string }> = {
       invoiceNumber: { header: 'فاکتور', cell: s => s.invoiceNumber },
       createdAt: { header: 'تاریخ', cell: s => formatJalaliDateTime(s.createdAt) },
-      userName: { header: 'صندوکدار', cell: s => s.userName },
+      userName: { header: 'صندوقدار', cell: s => s.userName },
       customerName: { header: 'مشتری', cell: s => s.customerName || '-' },
       items: { header: 'تعداد اقلام', cell: s => String(s.items?.length || 0) },
       paymentMethod: { header: 'نوع پرداخت', cell: s => s.paymentMethod === 'cash' ? 'نقدی' : s.paymentMethod === 'card' ? 'کارتی' : 'بدهی' },
@@ -174,7 +174,7 @@ export default function SalesHistory() {
   }
 
   const handleExcelSales = () => {
-    const headers = ['فاکتور', 'تاریخ', 'صندوکدار', 'مشتری', 'تعداد اقلام', 'نوع پرداخت', 'نوع فروش', 'مبلغ']
+    const headers = ['فاکتور', 'تاریخ', 'صندوق دار', 'مشتری', 'تعداد اقلام', 'نوع پرداخت', 'نوع فروش', 'مبلغ']
     const csvRows = filteredSales.map(s => [s.invoiceNumber, formatJalaliDateTime(s.createdAt), s.userName, s.customerName || '-', s.items?.length || 0, s.paymentMethod === 'cash' ? 'نقدی' : s.paymentMethod === 'card' ? 'کارتی' : 'بدهی', s.saleType === 'online' ? 'آنلاین' : 'حضوری', s.total_amount])
     downloadExcel('sales-history.csv', headers, csvRows)
   }
@@ -216,7 +216,7 @@ export default function SalesHistory() {
       <div className="flex flex-wrap gap-3 mb-4">
         <div className="flex-1 min-w-[200px]">
           <input ref={searchRef} type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-            className="input-field" placeholder="جستجوی فاکتور، مشتری، صندوک‌دار... (F2)" />
+            className="input-field" placeholder="جستجوی فاکتور، مشتری، صندوق‌دار... (F2)" />
         </div>
         <ShamsiDateInput value={startDate} onChange={setStartDate} label={fa.dashboard.dateFrom} />
         <ShamsiDateInput value={endDate} onChange={setEndDate} label={fa.dashboard.dateTo} />
@@ -295,8 +295,8 @@ export default function SalesHistory() {
                 { key: 'invoiceNumber' as keyof Sale, label: 'فاکتور' },
                 { key: 'userName' as keyof Sale, label: fa.admin.cashier },
                 { key: 'customerName' as keyof Sale, label: 'مشتری' },
-                { key: 'total_amount' as keyof Sale, label: fa.pos.total },
-                { key: 'createdAt' as keyof Sale, label: 'تاریخ' },
+                { key: 'total_amount' as keyof Sale, label:'اقلام'  },
+                { key: 'createdAt' as keyof Sale, label:  fa.payment.method},
               ]).map(col => (
                 <th key={String(col.key)}
                   className="px-4 py-2.5 cursor-pointer select-none transition-all duration-200 text-xs font-bold text-right"
@@ -308,10 +308,10 @@ export default function SalesHistory() {
                   </span>
                 </th>
               ))}
-              <th className="text-center px-4 py-2.5 text-xs font-bold" style={{ color: textSecondary }}>اقلام</th>
-              <th className="text-center px-4 py-2.5 text-xs font-bold" style={{ color: textSecondary }}>{fa.payment.method}</th>
               <th className="text-center px-4 py-2.5 text-xs font-bold" style={{ color: textSecondary }}>نوع فروش</th>
+              <th className="text-center px-4 py-2.5 text-xs font-bold" style={{ color: textSecondary }}>{fa.pos.total}</th>
               <th className="text-center px-4 py-2.5 text-xs font-bold" style={{ color: textSecondary }}>وضعیت</th>
+              <th className="text-center px-4 py-2.5 text-xs font-bold" style={{ color: textSecondary }}>تاریخ</th>
             </tr>
           </thead>
           <tbody>
@@ -483,7 +483,7 @@ export default function SalesHistory() {
                 const customerInfo = selectedSale.customerName ? `<div class="header-info"><span>مشتری: ${selectedSale.customerName}</span></div>` : ''
                 html += customerInfo
                 html += `<div class="header-info"><span>شماره فاکتور: ${selectedSale.invoiceNumber}</span><span>تاریخ: ${formatJalaliDateTime(selectedSale.createdAt)}</span></div>`
-                html += `<div class="header-info"><span>صندوکدار: ${selectedSale.userName}</span><span>نوع پرداخت: ${selectedSale.paymentMethod === 'cash' ? 'نقدی' : selectedSale.paymentMethod === 'card' ? 'کارتی' : 'بدهی'}</span><span>نوع فروش: ${selectedSale.saleType === 'online' ? 'آنلاین' : 'حضوری'}</span></div>`
+                html += `<div class="header-info"><span>صندوق دار: ${selectedSale.userName}</span><span>نوع پرداخت: ${selectedSale.paymentMethod === 'cash' ? 'نقدی' : selectedSale.paymentMethod === 'card' ? 'کارتی' : 'بدهی'}</span><span>نوع فروش: ${selectedSale.saleType === 'online' ? 'آنلاین' : 'حضوری'}</span></div>`
                 html += '<table><thead><tr><th>کالا</th><th>تعداد</th><th>قیمت واحد</th><th>جمع</th></tr></thead><tbody>'
                 selectedSale.items?.forEach((item: any) => { html += `<tr><td>${item.productTitle}</td><td>${item.quantity}</td><td>${item.unitPrice.toLocaleString('fa-IR')}</td><td>${item.subtotal.toLocaleString('fa-IR')}</td></tr>` })
                 html += '</tbody></table>'
@@ -628,7 +628,7 @@ export default function SalesHistory() {
         columns={[
           { key: 'invoiceNumber', label: 'فاکتور' },
           { key: 'createdAt', label: 'تاریخ' },
-          { key: 'userName', label: 'صندوکدار' },
+          { key: 'userName', label: 'صندوق دار' },
           { key: 'customerName', label: 'مشتری' },
           { key: 'items', label: 'تعداد اقلام' },
           { key: 'paymentMethod', label: 'نوع پرداخت' },

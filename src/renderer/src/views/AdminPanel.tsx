@@ -181,7 +181,7 @@ function UsersTab() {
           <div className="text-lg font-extrabold mt-1" style={{ color: '#f59e0b' }}>{users.filter(u => u.role === 'admin').length}</div>
         </UserCard>
         <UserCard>
-          <div className="text-[10px] font-bold" style={{ color: tSec }}>صندوک‌دارها</div>
+          <div className="text-[10px] font-bold" style={{ color: tSec }}>صندوق‌دارها</div>
           <div className="text-lg font-extrabold mt-1" style={{ color: '#22c55e' }}>{users.filter(u => u.role === 'cashier').length}</div>
         </UserCard>
       </div>
@@ -199,7 +199,7 @@ function UsersTab() {
             <div><Label>رمز (حداقل ۴ رقم)</Label><input type="number" value={form.pinCode} onChange={e => setForm(f => ({ ...f, pinCode: e.target.value.replace(/\D/g, '').slice(0, 6) }))} className="w-full px-3 py-2 rounded-lg text-sm font-bold font-mono tracking-widest outline-none" style={inStyle} maxLength={6} inputMode="numeric" /></div>
             <div><Label>نقش</Label>
               <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value as any }))} className="w-full px-3 py-2 rounded-lg text-sm font-bold outline-none" style={inStyle}>
-                <option value="cashier">صندوک‌دار</option>
+                <option value="cashier">صندوق‌دار</option>
                 <option value="admin">مدیر</option>
               </select>
             </div>
@@ -226,7 +226,7 @@ function UsersTab() {
               <tr key={u.id} style={{ borderTop: `1px solid ${cBorder}` }}>
                 <td className="px-4 py-2.5 text-xs font-mono" style={{ color: tSec }}>{u.id}</td>
                 <td className="px-4 py-2.5 font-bold" style={{ color: tPri }}>{u.name}</td>
-                <td className="px-4 py-2.5"><span className="px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ backgroundColor: u.role === 'admin' ? '#f59e0b15' : '#22c55e15', color: u.role === 'admin' ? '#f59e0b' : '#22c55e' }}>{u.role === 'admin' ? 'مدیر' : 'صندوک‌دار'}</span></td>
+                <td className="px-4 py-2.5"><span className="px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ backgroundColor: u.role === 'admin' ? '#f59e0b15' : '#22c55e15', color: u.role === 'admin' ? '#f59e0b' : '#22c55e' }}>{u.role === 'admin' ? 'مدیر' : 'صندوق‌دار'}</span></td>
                 <td className="px-4 py-2.5 text-xs" style={{ color: tSec }}>{u.createdAt?.slice(0, 10)}</td>
                 <td className="px-4 py-2.5">
                   <div className="flex gap-1 justify-center" onClick={e => e.stopPropagation()}>
@@ -262,7 +262,7 @@ function UsersTab() {
             <option value="accountant">حسابدار</option>
             <option value="salesperson">فروشنده</option>
             <option value="warehouse">انباردار</option>
-            <option value="cashier">صندوک‌دار</option>
+            <option value="cashier">صندوق‌دار</option>
             <option value="viewer">مشاهده‌گر</option>
           </select>
         </div>
