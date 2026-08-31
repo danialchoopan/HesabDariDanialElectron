@@ -91,7 +91,7 @@ describe('Sales math', () => {
     expect(stock.stock).toBe(97)              // 100 - 3
   })
 
-  it('rounds total up to nearest 500 and posts rounded amount to cash/revenue', () => {
+  it('records the exact subtotal as total (auto-rounding is NOT applied to accounting)', () => {
     setRounding(500)
     const sale = sales.createSale({
       userId: 1, customerId: null,
@@ -100,12 +100,13 @@ describe('Sales math', () => {
       saleDate: '2026-07-05 12:00:00',
     })
     expect(sale.subtotal).toBe(1250)
-    expect(sale.total_amount).toBe(1500)      // ceil(1250/500)*500
+    expect(sale.total_amount).toBe(1250)     // accounting total = exact subtotal
+    expect(sale.changeAmount).toBe(250)      // rounding lives in cash change only
     const j = journalFor('sale')!
     expect(j.lines.length).toBe(4)
     const cashAcct = mockDb.prepare("SELECT id FROM accounts WHERE code = '1100'").get()
     const cashLine = j.lines.find((l: any) => l.accountId === cashAcct.id)
-    expect(cashLine.debit).toBe(1500)
+    expect(cashLine.debit).toBe(1250)
     const totalDebit = j.lines.reduce((s: number, l: any) => s + l.debit, 0)
     const totalCredit = j.lines.reduce((s: number, l: any) => s + l.credit, 0)
     expect(totalDebit).toBe(totalCredit)
@@ -236,7 +237,7 @@ describe('Return math (real createReturn)', () => {
     expect(getAccountBalance('1400')).toBe(0)
   })
 
-  it('full return of a ROUNDED sale keeps the books balanced (rounding residual is retained)', () => {
+  it('full return of a previously-rounded sale nets the accounts to zero', () => {
     setRounding(500)
     const sale = sales.createSale({
       userId: 1, customerId: null,
@@ -244,16 +245,14 @@ describe('Return math (real createReturn)', () => {
       paymentMethod: 'cash', customerPaid: 1500,
       saleDate: '2026-07-05 12:00:00',
     })
-    expect(sale.total_amount).toBe(1500)      // subtotal 1250 rounded up to 1500
-    // UI refunds the raw line subtotal (unitPrice * qty) = 1250
+    expect(sale.total_amount).toBe(1250)      // accounting total is the exact subtotal
+    // Full return refunds the recorded total (1250)
     returns.createReturn(sale.id, 1, 1, 1, 'full return', 1250, false)
-    // The books stay balanced (debits == credits)…
     const lines = allJournalLines()
     expect(lines.reduce((s, l) => s + l.debit, 0)).toBe(lines.reduce((s, l) => s + l.credit, 0))
-    // …but the 250 rounding margin is retained: sale sold at 1500, refunded 1250.
-    // POLICY DECISION (see notes): should a full return refund the rounded total (1500)?
-    expect(getAccountBalance('1100')).toBe(250)
-    expect(getAccountBalance('4100')).toBe(-250)
+    // Sale fully reversed → no residual revenue/cash/inventory
+    expect(getAccountBalance('1100')).toBe(0)
+    expect(getAccountBalance('4100')).toBe(0)
     expect(getAccountBalance('1300')).toBe(0)
     expect(getAccountBalance('5100')).toBe(0)
   })
@@ -454,5 +453,34 @@ describe('Trial balance & general ledger', () => {
     expect(ledger.length).toBe(2)
     expect(ledger[0].balance).toBe(500)
     expect(ledger[1].balance).toBe(1000)
+  })
+
+  it('getJournalEntries returns per-entry debit/credit totals for the UI summary', () => {
+    sales.createSale({
+      userId: 1, customerId: null,
+      items: [{ productId: 1, productTitle: 'Widget', quantity: 1, unitPrice: 500, purchasePrice: 300 }],
+      paymentMethod: 'cash', customerPaid: 500, saleDate: '2026-07-05 12:00:00',
+    })
+    const res = journal.getJournalEntries({})
+    expect(res.entries.length).toBe(1)
+    const entry = res.entries[0]
+    expect(entry.totalDebit).toBe(800)   // cash 500 + cogs 300
+    expect(entry.totalCredit).toBe(800)  // revenue 500 + inventory 300
+  })
+
+  it('getJournalEntryById joins account code/name onto lines', () => {
+    const sale = sales.createSale({
+      userId: 1, customerId: null,
+      items: [{ productId: 1, productTitle: 'Widget', quantity: 1, unitPrice: 500, purchasePrice: 300 }],
+      paymentMethod: 'cash', customerPaid: 500, saleDate: '2026-07-05 12:00:00',
+    })
+    const res = journal.getJournalEntries({})
+    const detail = journal.getJournalEntryById(res.entries[0].id)
+    expect(detail).toBeTruthy()
+    expect(detail!.lines.length).toBe(4)
+    const cashLine = detail!.lines.find((l: any) => l.accountCode === '1100')
+    expect(cashLine).toBeTruthy()
+    expect(cashLine!.accountName).toBeTruthy()
+    expect(cashLine!.debit).toBe(500)
   })
 })
