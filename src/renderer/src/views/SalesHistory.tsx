@@ -287,6 +287,15 @@ export default function SalesHistory() {
       </div>
 
       <div className="rounded-2xl border overflow-hidden" style={{ backgroundColor: cardBg, borderColor: cardBorder, boxShadow: isDark ? 'none' : '0 1px 3px rgba(0,0,0,0.04)' }}>
+        {/*
+          Table layout note for developers:
+          The <th> headers render the SORTABLE columns first (from the array
+          below), then the fixed columns (اقلام/نوع پرداخت/نوع فروش/وضعیت).
+          The <tbody> cells MUST be in the SAME visual order: id, invoice,
+          cashier, customer, total, date, items, payment, saleType, status.
+          If you add/remove a column, update BOTH the headers and the cells
+          together, and keep sortKey labels matching what the cell shows.
+        */}
         <table className="w-full text-sm">
           <thead>
             <tr style={{ backgroundColor: isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.02)' }}>
@@ -295,8 +304,8 @@ export default function SalesHistory() {
                 { key: 'invoiceNumber' as keyof Sale, label: 'فاکتور' },
                 { key: 'userName' as keyof Sale, label: fa.admin.cashier },
                 { key: 'customerName' as keyof Sale, label: 'مشتری' },
-                { key: 'total_amount' as keyof Sale, label:'اقلام'  },
-                { key: 'createdAt' as keyof Sale, label:  fa.payment.method},
+                { key: 'total_amount' as keyof Sale, label: fa.pos.total },
+                { key: 'createdAt' as keyof Sale, label: 'تاریخ' },
               ]).map(col => (
                 <th key={String(col.key)}
                   className="px-4 py-2.5 cursor-pointer select-none transition-all duration-200 text-xs font-bold text-right"
@@ -308,10 +317,10 @@ export default function SalesHistory() {
                   </span>
                 </th>
               ))}
+              <th className="text-center px-4 py-2.5 text-xs font-bold" style={{ color: textSecondary }}>اقلام</th>
+              <th className="text-center px-4 py-2.5 text-xs font-bold" style={{ color: textSecondary }}>{fa.payment.method}</th>
               <th className="text-center px-4 py-2.5 text-xs font-bold" style={{ color: textSecondary }}>نوع فروش</th>
-              <th className="text-center px-4 py-2.5 text-xs font-bold" style={{ color: textSecondary }}>{fa.pos.total}</th>
               <th className="text-center px-4 py-2.5 text-xs font-bold" style={{ color: textSecondary }}>وضعیت</th>
-              <th className="text-center px-4 py-2.5 text-xs font-bold" style={{ color: textSecondary }}>تاریخ</th>
             </tr>
           </thead>
           <tbody>
@@ -332,6 +341,8 @@ export default function SalesHistory() {
                   <td className="px-4 py-2.5 font-mono text-xs font-bold" style={{ color: primary }}>{s.invoiceNumber}</td>
                   <td className="px-4 py-2.5 font-bold" style={{ color: textPrimary }}>{s.userName}</td>
                   <td className="px-4 py-2.5" style={{ color: s.customerName ? textPrimary : textSecondary }}>{s.customerName || '-'}</td>
+                  <td className="px-4 py-2.5 font-extrabold text-right" style={{ color: isFullyReturned ? '#ef4444' : textPrimary, textDecoration: isFullyReturned ? 'line-through' : 'none' }}>{s.total_amount.toLocaleString('fa-IR')}</td>
+                  <td className="px-5 py-2.5 text-xs" style={{ color: textSecondary }}>{formatJalaliDateTime(s.createdAt)}</td>
                   <td className="px-4 py-2.5 text-center font-bold" style={{ color: textPrimary }}>{s.items.length}</td>
                   <td className="px-4 py-2.5 text-center">
                     <span className="px-2 py-0.5 rounded-full text-[11px] font-bold inline-block" style={{
@@ -345,7 +356,6 @@ export default function SalesHistory() {
                       color: s.saleType === 'online' ? '#3b82f6' : '#22c55e',
                     }}>{s.saleType === 'online' ? 'آنلاین' : 'حضوری'}</span>
                   </td>
-                  <td className="px-4 py-2.5 font-extrabold text-right" style={{ color: isFullyReturned ? '#ef4444' : textPrimary, textDecoration: isFullyReturned ? 'line-through' : 'none' }}>{s.total_amount.toLocaleString('fa-IR')}</td>
                   <td className="px-4 py-2.5 text-center">
                     {isFullyReturned ? (
                       <span className="px-2.5 py-1 rounded-full text-[10px] font-bold" style={{ backgroundColor: isDark ? 'rgba(239,68,68,0.15)' : '#fee2e2', color: '#ef4444' }}>بازگشت کامل</span>
@@ -355,11 +365,10 @@ export default function SalesHistory() {
                       <span className="px-2.5 py-1 rounded-full text-[10px] font-bold" style={{ backgroundColor: isDark ? 'rgba(34,197,94,0.15)' : '#dcfce7', color: '#22c55e' }}>عادی</span>
                     )}
                   </td>
-                  <td className="px-5 py-2.5 text-xs" style={{ color: textSecondary }}>{formatJalaliDateTime(s.createdAt)}</td>
                 </tr>
               )
             })}
-            {pagedSales.length === 0 && <tr><td colSpan={9} className="text-center py-12" style={{ color: textSecondary }}>{fa.dashboard.noData}</td></tr>}
+            {pagedSales.length === 0 && <tr><td colSpan={10} className="text-center py-12" style={{ color: textSecondary }}>{fa.dashboard.noData}</td></tr>}
           </tbody>
         </table>
       </div>
