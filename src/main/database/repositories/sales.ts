@@ -16,9 +16,8 @@
 import { getDatabase } from '../connection'
 import type { Sale, SaleInput } from '../../../types'
 import { decrementStock } from './products'
-import { getAutoRounding } from './settings'
 import { updateCustomerBalance, addLedgerEntry } from './customers'
-import { roundToNearest, calculateLineSubtotal, calculateLineProfit } from '../../utils/math'
+import { calculateLineSubtotal, calculateLineProfit } from '../../utils/math'
 import { postSaleJournal } from './journal'
 
 export function createSale(input: SaleInput): Sale {
@@ -26,14 +25,16 @@ export function createSale(input: SaleInput): Sale {
   const saleDate = input.saleDate || new Date().toISOString().slice(0, 19).replace('T', ' ')
   const affectsInventory = input.affectsInventory !== false ? 1 : 0
   const invoiceNumber = generateInvoiceNumber(saleDate)
-  const roundTo = getAutoRounding()
 
   let rawSubtotal = 0
   for (const item of input.items) {
     rawSubtotal += calculateLineSubtotal(item.unitPrice, item.quantity)
   }
 
-  const total_amount = roundToNearest(rawSubtotal, roundTo) + (input.shippingCost || 0)
+  // Accounting truth: the recorded total is the exact line subtotal (+ shipping).
+  // Rounding is a cash-convenience concern only — it belongs in the POS change
+  // calculation (customerPaid), never in the revenue/journal numbers.
+  const total_amount = rawSubtotal + (input.shippingCost || 0)
 
   const changeAmount = input.paymentMethod === 'cash'
     ? Math.max(0, input.customerPaid - total_amount)
@@ -115,6 +116,7 @@ export function getSaleById(id: number): Sale | undefined {
     items: items.map(mapSaleItem),
     subtotal: saleRow.subtotal as number,
     total_amount: saleRow.total_amount as number,
+    totalNetProfit: saleRow.totalNetProfit as number,
     paymentMethod: saleRow.paymentMethod as 'cash' | 'card' | 'ledger',
     customerPaid: saleRow.customerPaid as number,
     changeAmount: saleRow.changeAmount as number,
@@ -124,6 +126,7 @@ export function getSaleById(id: number): Sale | undefined {
     saleType: (saleRow.saleType as 'in-person' | 'online') ?? 'in-person',
     saleDate: (saleRow.saleDate as string) ?? (saleRow.createdAt as string),
     affectsInventory: (saleRow.affectsInventory ?? 1) === 1,
+    shippingCost: (saleRow.shipping_cost as number) ?? 0,
     createdAt: saleRow.createdAt as string,
   }
 }
@@ -146,6 +149,7 @@ export function getSalesByDateRange(startDate: string, endDate: string): Sale[] 
       items: items.map(mapSaleItem),
       subtotal: saleRow.subtotal as number,
       total_amount: saleRow.total_amount as number,
+      totalNetProfit: saleRow.totalNetProfit as number,
       paymentMethod: saleRow.paymentMethod as 'cash' | 'card' | 'ledger',
       customerPaid: saleRow.customerPaid as number,
       changeAmount: saleRow.changeAmount as number,
@@ -155,6 +159,7 @@ export function getSalesByDateRange(startDate: string, endDate: string): Sale[] 
       saleType: (saleRow.saleType as 'in-person' | 'online') ?? 'in-person',
       saleDate: (saleRow.saleDate as string) ?? (saleRow.createdAt as string),
       affectsInventory: (saleRow.affectsInventory ?? 1) === 1,
+      shippingCost: (saleRow.shipping_cost as number) ?? 0,
       createdAt: saleRow.createdAt as string,
     }
   })

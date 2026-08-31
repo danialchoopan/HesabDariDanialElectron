@@ -40,8 +40,8 @@ export default function JournalEntries() {
 
   const toggleExpand = (id: number) => setExpandedId(expandedId === id ? null : id)
 
-  const totalDebit = entries.reduce((s: number, e: any) => s + (e.lines?.reduce((ls: number, l: any) => ls + l.debit, 0) || 0), 0)
-  const totalCredit = entries.reduce((s: number, e: any) => s + (e.lines?.reduce((ls: number, l: any) => ls + l.credit, 0) || 0), 0)
+  const totalDebit = entries.reduce((s: number, e: any) => s + (e.totalDebit || 0), 0)
+  const totalCredit = entries.reduce((s: number, e: any) => s + (e.totalCredit || 0), 0)
   const { sorted, sortKey, sortDir, toggleSort } = useSortable(entries)
 
   return (
@@ -175,7 +175,10 @@ function ExpandedEntry({ entryId, cardBg, cardBorder, textPrimary, textSecondary
         <tbody>
           {entry.lines?.map((l: any) => (
             <tr key={l.id} style={{ borderBottom: `1px solid ${cardBorder}` }}>
-              <td className="px-3 py-1.5" style={{ color: textPrimary }}>{l.accountId}</td>
+              <td className="px-3 py-1.5" style={{ color: textPrimary }}>
+                {l.accountCode ? <span className="font-mono text-xs mr-1" style={{ color: '#3b82f6' }}>{l.accountCode}</span> : null}
+                {l.accountName || l.accountId}
+              </td>
               <td className="px-3 py-1.5 font-bold" style={{ color: l.debit > 0 ? '#22c55e' : textSecondary }}>{l.debit > 0 ? l.debit.toLocaleString('fa-IR') : '-'}</td>
               <td className="px-3 py-1.5 font-bold" style={{ color: l.credit > 0 ? '#ef4444' : textSecondary }}>{l.credit > 0 ? l.credit.toLocaleString('fa-IR') : '-'}</td>
               <td className="px-3 py-1.5 text-xs" style={{ color: textSecondary }}>{l.description}</td>

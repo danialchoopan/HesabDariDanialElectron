@@ -89,7 +89,11 @@ export function InlineEditCell({ value, onSave, display, className = '', style, 
           inputMode="numeric"
           value={temp}
           onChange={(e) => setTemp(formatNumberInput(e.target.value))}
-          onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); if (e.key === 'Escape') cancel() }}
+          onKeyDown={(e) => {
+            e.stopPropagation()
+            if (e.key === 'Enter') { e.preventDefault(); commit() }
+            if (e.key === 'Escape') cancel()
+          }}
           className="w-24 text-center text-sm font-bold rounded-lg px-2 py-1 outline-none"
           style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)', border: '2px solid #3b82f6' }}
         />

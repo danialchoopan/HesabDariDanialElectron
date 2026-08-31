@@ -85,6 +85,7 @@ export interface Sale {
   items: SaleItem[]
   subtotal: number
   total_amount: number
+  totalNetProfit: number
   paymentMethod: 'cash' | 'card' | 'ledger'
   customerId?: number
   customerName?: string
@@ -96,6 +97,7 @@ export interface Sale {
   saleType?: 'in-person' | 'online'
   saleDate: string
   affectsInventory: boolean
+  shippingCost?: number
   createdAt: string
 }
 
@@ -266,11 +268,13 @@ export interface JournalEntry {
   referenceType: string | null; referenceId: number | null
   fiscalPeriodId: number | null; isPosted: boolean
   createdBy: number | null; createdAt: string
+  totalDebit?: number; totalCredit?: number
 }
 
 export interface JournalLine {
   id: number; entryId: number; accountId: number
   debit: number; credit: number; description: string
+  accountCode?: string; accountName?: string
 }
 
 export interface JournalEntryWithLines extends JournalEntry {
