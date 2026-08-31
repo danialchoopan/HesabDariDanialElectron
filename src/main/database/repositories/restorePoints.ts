@@ -10,18 +10,42 @@
  *
  * Stored in {userData}/restore_points/ directory.
  * Auto-cleanup configurable via settings (default: keep last 10).
+ *
+ * WAL safety: the app runs in WAL mode, so a restore point is only a raw copy
+ * of pos.db. createRestorePoint therefore checkpoints the WAL first (the main
+ * file is then fully consistent and self-contained), and restoreRestorePoint
+ * clears the live WAL/SHM after replacing the main file.
  */
 
 import { app } from 'electron'
 import { join } from 'path'
 import { copyFileSync, existsSync, unlinkSync, statSync, mkdirSync, readFileSync } from 'fs'
 import { createHash } from 'crypto'
-import { getDatabase } from '../connection'
+import { getDatabase, closeDatabase } from '../connection'
+import { runMigrations, validateAfterMigration } from '../schemaMigration'
+import { checkIntegrity, createBackup } from '../backup'
 
 const RP_DIR = join(app.getPath('userData'), 'restore_points')
+const DB_PATH = join(app.getPath('userData'), 'pos.db')
+const WAL_PATH = join(app.getPath('userData'), 'pos.db-wal')
+const SHM_PATH = join(app.getPath('userData'), 'pos.db-shm')
 
 function ensureDir(): void {
   if (!existsSync(RP_DIR)) mkdirSync(RP_DIR, { recursive: true })
+}
+
+function checkpointWal(): void {
+  try {
+    getDatabase().pragma('wal_checkpoint(TRUNCATE)')
+  } catch (e) {
+    console.warn('[RestorePoints] WAL checkpoint failed:', e)
+  }
+}
+
+function removeLiveWalShm(): void {
+  for (const p of [WAL_PATH, SHM_PATH]) {
+    try { if (existsSync(p)) unlinkSync(p) } catch (e) { console.warn('[RestorePoints] Failed to remove', p, e) }
+  }
 }
 
 export interface RestorePoint {
@@ -40,14 +64,14 @@ export interface RestorePoint {
 export function createRestorePoint(name: string, description: string = '', createdBy: string = 'admin'): RestorePoint {
   ensureDir()
   const db = getDatabase()
-  const DB_PATH = join(app.getPath('userData'), 'pos.db')
 
   // Generate filename
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
   const fileName = `rp-${timestamp}.db`
   const filePath = join(RP_DIR, fileName)
 
-  // Copy database
+  // Copy database (checkpoint WAL first so the copy is fully consistent)
+  checkpointWal()
   copyFileSync(DB_PATH, filePath)
 
   // Compute hash
@@ -95,6 +119,49 @@ export function verifyRestorePoint(id: number): { valid: boolean; error?: string
   const currentHash = createHash('sha256').update(fileData).digest('hex')
   if (currentHash !== rp.dbHash) return { valid: false, error: 'هش تطابق ندارد — فایل تغییر کرده' }
   return { valid: true }
+}
+
+/**
+ * Restore the database from a restore point.
+ * Safety pipeline: hash verify → SQLite integrity → pre-restore backup →
+ * close DB → replace file → clear stale WAL/SHM → reopen → migrate → validate.
+ */
+export function restoreRestorePoint(id: number): { success: boolean; error?: string; message?: string } {
+  const rp = getRestorePointById(id)
+  if (!rp) return { success: false, error: 'نقطه بازیابی یافت نشد' }
+  if (!existsSync(rp.dbPath)) return { success: false, error: 'فایل نقطه بازیابی یافت نشد' }
+
+  const verify = verifyRestorePoint(id)
+  if (!verify.valid) return { success: false, error: verify.error }
+
+  const integrity = checkIntegrity(rp.dbPath)
+  if (!integrity.success) {
+    return { success: false, error: `یکپارچگی فایل تأیید نشد: ${integrity.error || integrity.integrityCheck}` }
+  }
+
+  try {
+    // Safety backup of the current state
+    createBackup('pre-restore')
+
+    closeDatabase()
+    copyFileSync(rp.dbPath, DB_PATH)
+    removeLiveWalShm()
+
+    // Reopen (runs initializeDatabase + migrateSchema), then migrate + validate
+    getDatabase()
+    const mig = runMigrations()
+    const validation = validateAfterMigration()
+
+    if (!validation.valid) {
+      return { success: false, error: `بازیابی انجام شد اما یکپارچگی داده تأیید نشد: ${validation.issues.join('; ')}` }
+    }
+    if (mig.errors.length > 0) {
+      return { success: false, error: `بازیابی انجام شد اما مهاجرت دیتابیس خطا داشت: ${mig.errors.join('; ')}` }
+    }
+    return { success: true, message: 'بازیابی از نقطه بازیابی با موفقیت انجام شد' }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
 }
 
 /** Auto-cleanup: keep only the most recent N restore points. */

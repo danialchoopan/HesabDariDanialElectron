@@ -66,7 +66,7 @@ import { runBackupTests } from '../database/backup.test'
 import { runSmartExportTests } from '../database/smartExport.test'
 import { runMigrationTests } from '../database/migration.test'
 import { isFirstRun, getDatabase, closeDatabase } from '../database/connection'
-import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync } from 'fs'
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs'
 import { join } from 'path'
 import { randomBytes } from 'crypto'
 import { app } from 'electron'
@@ -90,19 +90,29 @@ export function registerAllHandlers(): void {
   handle('system:isFirstRun', () => ({ isFirstRun: isFirstRun() }))
 
   // ─── Update Check ──────────────────────────────────────
+  // NOTE: keep this repo owner/name in sync with the project's GitHub home.
+  const UPDATE_REPO = 'danialchoopan/HesabDariDanialElectron'
   ipcMain.handle('system:checkUpdate', async () => {
     try {
       const currentVersion = app.getVersion()
-      const res = await fetch('https://api.github.com/repos/danialchoopan/DukanElectronJS/releases/latest')
+      let res: Response
+      try {
+        res = await fetch(`https://api.github.com/repos/${UPDATE_REPO}/releases/latest`, { signal: AbortSignal.timeout(10000) })
+      } catch (e) {
+        return { success: false, error: 'اتصال به سرور برقرار نشد' }
+      }
+      if (res.status === 404) return { success: false, error: 'نسخه‌ای در GitHub یافت نشد' }
       if (!res.ok) return { success: false, error: `HTTP ${res.status}` }
       const release = await res.json()
-      const latestVersion = (release.tag_name || '').replace('v', '')
+      const latestVersion = String(release.tag_name || '').replace(/^v/i, '').trim()
+      // Numeric semver comparison — "different string" is NOT the same as "newer".
+      const hasUpdate = latestVersion !== '' && schemaMigration.compareVersions(latestVersion, currentVersion) > 0
       return {
         success: true,
         data: {
           currentVersion,
           latestVersion,
-          hasUpdate: latestVersion !== currentVersion,
+          hasUpdate,
           downloadUrl: release.html_url || '',
           releaseName: release.name || latestVersion,
           releaseDate: release.published_at || '',
@@ -110,6 +120,10 @@ export function registerAllHandlers(): void {
         },
       }
     } catch (err) { return { success: false, error: err instanceof Error ? err.message : String(err) } }
+  })
+
+  ipcMain.handle('system:getVersion', () => {
+    return { success: true, data: app.getVersion() }
   })
 
   // ─── Auth ───────────────────────────────────────────────
@@ -406,7 +420,8 @@ export function registerAllHandlers(): void {
     })
     if (result.canceled || !result.filePath) return { success: false, error: 'cancelled' }
     try {
-      copyFileSync(join(app.getPath('userData'), 'pos.db'), result.filePath)
+      // Checkpoint WAL + copy a fully consistent snapshot (raw copy can lose WAL frames)
+      backupService.copyDatabaseTo(result.filePath)
       const hash = require('crypto').createHash('sha256').update(require('fs').readFileSync(result.filePath)).digest('hex')
       return { success: true, data: result.filePath, hash }
     } catch (err) {
@@ -422,12 +437,9 @@ export function registerAllHandlers(): void {
       properties: ['openFile'],
     })
     if (result.canceled || !result.filePaths[0]) return { success: false, error: 'cancelled' }
-    try {
-      copyFileSync(result.filePaths[0], join(app.getPath('userData'), 'pos.db'))
-      return { success: true }
-    } catch (err) {
-      return { success: false, error: err instanceof Error ? err.message : String(err) }
-    }
+    // Use the full safe-restore path (integrity → pre-backup → close → copy →
+    // clear WAL/SHM → reopen → migrate → validate) instead of overwriting an open DB.
+    return backupService.restoreBackup(result.filePaths[0])
   })
 
   ipcMain.handle('backup:create', () => { try { return { success: true, data: backupService.createBackup() } } catch (err) { return { success: false, error: err instanceof Error ? err.message : String(err) } } })
@@ -440,7 +452,7 @@ export function registerAllHandlers(): void {
         filters: [{ name: 'SQLite Database', extensions: ['db'] }],
       })
       if (result.canceled || !result.filePath) return { success: false, error: 'cancelled' }
-      copyFileSync(join(app.getPath('userData'), 'pos.db'), result.filePath)
+      backupService.copyDatabaseTo(result.filePath)
       return { success: true, data: result.filePath }
     } catch (err) { return { success: false, error: err instanceof Error ? err.message : String(err) } }
   })
@@ -500,7 +512,7 @@ export function registerAllHandlers(): void {
         return { success: true, data: outPath }
       } else {
         if (a.filePath) {
-          copyFileSync(join(app.getPath('userData'), 'pos.db'), a.filePath)
+          backupService.copyDatabaseTo(a.filePath)
           return { success: true, data: a.filePath }
         }
         return { success: true, data: backupService.createBackup(a.label) }
@@ -600,6 +612,7 @@ export function registerAllHandlers(): void {
   handleArg<{ id: number }, any>('restorePoints:getById', (a) => restorePointsRepo.getRestorePointById(a.id))
   ipcMain.handle('restorePoints:delete', (_event, a: { id: number }) => ({ success: restorePointsRepo.deleteRestorePoint(a.id) }))
   ipcMain.handle('restorePoints:verify', (_event, a: { id: number }) => restorePointsRepo.verifyRestorePoint(a.id))
+  ipcMain.handle('restorePoints:restore', (_event, a: { id: number }) => restorePointsRepo.restoreRestorePoint(a.id))
   handleArg<{ keepCount?: number }, any>('restorePoints:cleanup', (a) => restorePointsRepo.cleanupRestorePoints(a.keepCount || 10))
   handle('restorePoints:stats', () => restorePointsRepo.getRestorePointStats())
 
@@ -620,7 +633,7 @@ export function registerAllHandlers(): void {
     })
     if (result.canceled || !result.filePath) return { success: false, error: 'cancelled' }
     try {
-      copyFileSync(join(app.getPath('userData'), 'pos.db'), result.filePath)
+      backupService.copyDatabaseTo(result.filePath)
       return { success: true, data: result.filePath }
     } catch (err) { return { success: false, error: err instanceof Error ? err.message : String(err) } }
   })
@@ -1050,7 +1063,10 @@ export function registerAllHandlers(): void {
   })
 
   handleArg('smartImport:execute', (arg: { data: any; options: any; userName?: string }) => {
-    return smartExportService.smartImport(arg.data, arg.options)
+    // Migrate old file versions first so the data aligns with the current schema
+    const migrated = migrationService.migrateData(arg.data)
+    const finalData = migrated.migrated ? migrated.data : arg.data
+    return smartExportService.smartImport(finalData, arg.options, arg.userName || 'user')
   })
 
   handleArg('smartImport:validate', (arg: { filePath: string }) => {

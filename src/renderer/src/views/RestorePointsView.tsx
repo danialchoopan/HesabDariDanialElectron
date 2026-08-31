@@ -26,6 +26,8 @@ export default function RestorePointsView() {
   const [rpName, setRpName] = useState('')
   const [rpDesc, setRpDesc] = useState('')
   const [showDelete, setShowDelete] = useState<any>(null)
+  const [showRestore, setShowRestore] = useState<any>(null)
+  const [restoring, setRestoring] = useState(false)
   const [autoCleanup, setAutoCleanup] = useState('false')
   const [keepCount, setKeepCount] = useState(10)
 
@@ -61,6 +63,16 @@ export default function RestorePointsView() {
     await window.api.restorePoints.delete(id)
     setShowDelete(null)
     await load()
+  }
+
+  const handleRestore = async (id: number) => {
+    setRestoring(true)
+    try {
+      const r = await window.api.restorePoints.restore(id)
+      setShowRestore(null)
+      if (r.success) { alert(`بازیابی موفق:\n${r.data?.message || r.data?.error || 'انجام شد'}`); window.location.reload() }
+      else alert(`خطا:\n${r.data?.error || r.error || 'نامشخص'}`)
+    } finally { setRestoring(false) }
   }
 
   const handleAutoCleanup = async () => {
@@ -138,6 +150,7 @@ export default function RestorePointsView() {
             <div className="flex gap-1">
               <button onClick={async () => { const r = await window.api.restorePoints.verify(rp.id); alert(r.success && r.data?.valid ? '✓ سالم' : `✗ ${r.data?.error || r.error || 'خطا'}`) }}
                 className="px-2 py-1 rounded text-[10px] font-bold" style={{ backgroundColor: 'rgba(34,197,94,0.15)', color: '#22c55e' }}>بررسی</button>
+              <button onClick={() => setShowRestore(rp)} className="px-2 py-1 rounded text-[10px] font-bold" style={{ backgroundColor: 'rgba(59,130,246,0.15)', color: '#3b82f6' }}>بازیابی</button>
               <button onClick={() => setShowDelete(rp)} className="px-2 py-1 rounded text-[10px] font-bold" style={{ backgroundColor: 'rgba(239,68,68,0.15)', color: '#ef4444' }}>حذف</button>
             </div>
           </div>
@@ -159,6 +172,21 @@ export default function RestorePointsView() {
             <div><label className="text-xs font-bold block mb-1" style={{ color: tSec }}>توضیحات</label>
               <textarea value={rpDesc} onChange={(e) => setRpDesc(e.target.value)} className="input-field text-sm w-full" rows={2} style={inputStyle} /></div>
           </div>
+        </Dialog>
+      )}
+
+      {/* Restore Dialog */}
+      {showRestore && (
+        <Dialog open={true} onClose={() => setShowRestore(null)} title="بازیابی از نقطه بازیابی" maxWidth="max-w-xs"
+          icon={<svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>}
+          footer={<>
+            <DialogButton variant="ghost" onClick={() => setShowRestore(null)}>لغو</DialogButton>
+            <DialogButton variant="primary" onClick={() => handleRestore(showRestore.id)} disabled={restoring}>
+              {restoring ? 'در حال بازیابی...' : 'بازیابی'}
+            </DialogButton>
+          </>}>
+          <p className="text-sm text-center" style={{ color: tPri }}>بازیابی از "{showRestore.name}"؟</p>
+          <p className="text-xs text-center mt-1" style={{ color: tSec }}>دیتابیس فعلی ابتدا به‌صورت خودکار پشتیبان‌گیری می‌شود</p>
         </Dialog>
       )}
 
