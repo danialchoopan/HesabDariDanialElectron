@@ -150,7 +150,7 @@ export default function SalesHistory() {
     const colMap: Record<string, { header: string; cell: (s: any) => string }> = {
       invoiceNumber: { header: 'فاکتور', cell: s => s.invoiceNumber },
       createdAt: { header: 'تاریخ', cell: s => formatJalaliDateTime(s.createdAt) },
-      userName: { header: 'صندوکدار', cell: s => s.userName },
+      userName: { header: 'صندوقدار', cell: s => s.userName },
       customerName: { header: 'مشتری', cell: s => s.customerName || '-' },
       items: { header: 'تعداد اقلام', cell: s => String(s.items?.length || 0) },
       paymentMethod: { header: 'نوع پرداخت', cell: s => s.paymentMethod === 'cash' ? 'نقدی' : s.paymentMethod === 'card' ? 'کارتی' : 'بدهی' },
@@ -174,7 +174,7 @@ export default function SalesHistory() {
   }
 
   const handleExcelSales = () => {
-    const headers = ['فاکتور', 'تاریخ', 'صندوکدار', 'مشتری', 'تعداد اقلام', 'نوع پرداخت', 'نوع فروش', 'مبلغ']
+    const headers = ['فاکتور', 'تاریخ', 'صندوق دار', 'مشتری', 'تعداد اقلام', 'نوع پرداخت', 'نوع فروش', 'مبلغ']
     const csvRows = filteredSales.map(s => [s.invoiceNumber, formatJalaliDateTime(s.createdAt), s.userName, s.customerName || '-', s.items?.length || 0, s.paymentMethod === 'cash' ? 'نقدی' : s.paymentMethod === 'card' ? 'کارتی' : 'بدهی', s.saleType === 'online' ? 'آنلاین' : 'حضوری', s.total_amount])
     downloadExcel('sales-history.csv', headers, csvRows)
   }
@@ -216,7 +216,7 @@ export default function SalesHistory() {
       <div className="flex flex-wrap gap-3 mb-4">
         <div className="flex-1 min-w-[200px]">
           <input ref={searchRef} type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-            className="input-field" placeholder="جستجوی فاکتور، مشتری، صندوک‌دار... (F2)" />
+            className="input-field" placeholder="جستجوی فاکتور، مشتری، صندوق‌دار... (F2)" />
         </div>
         <ShamsiDateInput value={startDate} onChange={setStartDate} label={fa.dashboard.dateFrom} />
         <ShamsiDateInput value={endDate} onChange={setEndDate} label={fa.dashboard.dateTo} />
@@ -287,6 +287,15 @@ export default function SalesHistory() {
       </div>
 
       <div className="rounded-2xl border overflow-hidden" style={{ backgroundColor: cardBg, borderColor: cardBorder, boxShadow: isDark ? 'none' : '0 1px 3px rgba(0,0,0,0.04)' }}>
+        {/*
+          Table layout note for developers:
+          The <th> headers render the SORTABLE columns first (from the array
+          below), then the fixed columns (اقلام/نوع پرداخت/نوع فروش/وضعیت).
+          The <tbody> cells MUST be in the SAME visual order: id, invoice,
+          cashier, customer, total, date, items, payment, saleType, status.
+          If you add/remove a column, update BOTH the headers and the cells
+          together, and keep sortKey labels matching what the cell shows.
+        */}
         <table className="w-full text-sm">
           <thead>
             <tr style={{ backgroundColor: isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.02)' }}>
@@ -332,6 +341,8 @@ export default function SalesHistory() {
                   <td className="px-4 py-2.5 font-mono text-xs font-bold" style={{ color: primary }}>{s.invoiceNumber}</td>
                   <td className="px-4 py-2.5 font-bold" style={{ color: textPrimary }}>{s.userName}</td>
                   <td className="px-4 py-2.5" style={{ color: s.customerName ? textPrimary : textSecondary }}>{s.customerName || '-'}</td>
+                  <td className="px-4 py-2.5 font-extrabold text-right" style={{ color: isFullyReturned ? '#ef4444' : textPrimary, textDecoration: isFullyReturned ? 'line-through' : 'none' }}>{s.total_amount.toLocaleString('fa-IR')}</td>
+                  <td className="px-5 py-2.5 text-xs" style={{ color: textSecondary }}>{formatJalaliDateTime(s.createdAt)}</td>
                   <td className="px-4 py-2.5 text-center font-bold" style={{ color: textPrimary }}>{s.items.length}</td>
                   <td className="px-4 py-2.5 text-center">
                     <span className="px-2 py-0.5 rounded-full text-[11px] font-bold inline-block" style={{
@@ -345,7 +356,6 @@ export default function SalesHistory() {
                       color: s.saleType === 'online' ? '#3b82f6' : '#22c55e',
                     }}>{s.saleType === 'online' ? 'آنلاین' : 'حضوری'}</span>
                   </td>
-                  <td className="px-4 py-2.5 font-extrabold text-right" style={{ color: isFullyReturned ? '#ef4444' : textPrimary, textDecoration: isFullyReturned ? 'line-through' : 'none' }}>{s.total_amount.toLocaleString('fa-IR')}</td>
                   <td className="px-4 py-2.5 text-center">
                     {isFullyReturned ? (
                       <span className="px-2.5 py-1 rounded-full text-[10px] font-bold" style={{ backgroundColor: isDark ? 'rgba(239,68,68,0.15)' : '#fee2e2', color: '#ef4444' }}>بازگشت کامل</span>
@@ -355,11 +365,10 @@ export default function SalesHistory() {
                       <span className="px-2.5 py-1 rounded-full text-[10px] font-bold" style={{ backgroundColor: isDark ? 'rgba(34,197,94,0.15)' : '#dcfce7', color: '#22c55e' }}>عادی</span>
                     )}
                   </td>
-                  <td className="px-5 py-2.5 text-xs" style={{ color: textSecondary }}>{formatJalaliDateTime(s.createdAt)}</td>
                 </tr>
               )
             })}
-            {pagedSales.length === 0 && <tr><td colSpan={9} className="text-center py-12" style={{ color: textSecondary }}>{fa.dashboard.noData}</td></tr>}
+            {pagedSales.length === 0 && <tr><td colSpan={10} className="text-center py-12" style={{ color: textSecondary }}>{fa.dashboard.noData}</td></tr>}
           </tbody>
         </table>
       </div>
@@ -483,7 +492,7 @@ export default function SalesHistory() {
                 const customerInfo = selectedSale.customerName ? `<div class="header-info"><span>مشتری: ${selectedSale.customerName}</span></div>` : ''
                 html += customerInfo
                 html += `<div class="header-info"><span>شماره فاکتور: ${selectedSale.invoiceNumber}</span><span>تاریخ: ${formatJalaliDateTime(selectedSale.createdAt)}</span></div>`
-                html += `<div class="header-info"><span>صندوکدار: ${selectedSale.userName}</span><span>نوع پرداخت: ${selectedSale.paymentMethod === 'cash' ? 'نقدی' : selectedSale.paymentMethod === 'card' ? 'کارتی' : 'بدهی'}</span><span>نوع فروش: ${selectedSale.saleType === 'online' ? 'آنلاین' : 'حضوری'}</span></div>`
+                html += `<div class="header-info"><span>صندوق دار: ${selectedSale.userName}</span><span>نوع پرداخت: ${selectedSale.paymentMethod === 'cash' ? 'نقدی' : selectedSale.paymentMethod === 'card' ? 'کارتی' : 'بدهی'}</span><span>نوع فروش: ${selectedSale.saleType === 'online' ? 'آنلاین' : 'حضوری'}</span></div>`
                 html += '<table><thead><tr><th>کالا</th><th>تعداد</th><th>قیمت واحد</th><th>جمع</th></tr></thead><tbody>'
                 selectedSale.items?.forEach((item: any) => { html += `<tr><td>${item.productTitle}</td><td>${item.quantity}</td><td>${item.unitPrice.toLocaleString('fa-IR')}</td><td>${item.subtotal.toLocaleString('fa-IR')}</td></tr>` })
                 html += '</tbody></table>'
@@ -628,7 +637,7 @@ export default function SalesHistory() {
         columns={[
           { key: 'invoiceNumber', label: 'فاکتور' },
           { key: 'createdAt', label: 'تاریخ' },
-          { key: 'userName', label: 'صندوکدار' },
+          { key: 'userName', label: 'صندوق دار' },
           { key: 'customerName', label: 'مشتری' },
           { key: 'items', label: 'تعداد اقلام' },
           { key: 'paymentMethod', label: 'نوع پرداخت' },

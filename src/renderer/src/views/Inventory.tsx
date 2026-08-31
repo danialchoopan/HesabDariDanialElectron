@@ -847,8 +847,8 @@ export default function Inventory({ initialTab, highlightId, onHighlightDone }: 
                   return (
                     <g key={i}>
                       <rect x={x} y={145 - barH} width={40} height={barH} rx={4} fill={donutColors[i % donutColors.length]} opacity={0.85} />
-                      <text x={x + 20} y={140 - barH} textAnchor="middle" fill={textPrimary} fontSize="7" fontWeight="bold" fontFamily="'IBM Plex Sans'">{(cat.totalValue || 0).toLocaleString('fa-IR')}</text>
-                      <text x={x + 20} y={158} textAnchor="middle" fill={textSecondary} fontSize="7" fontFamily="'IBM Plex Sans'">{label}</text>
+                      <text x={x + 20} y={140 - barH} textAnchor="middle" fill={textPrimary} fontSize="7" fontWeight="bold" fontFamily="'Vazirmatn'">{(cat.totalValue || 0).toLocaleString('fa-IR')}</text>
+                      <text x={x + 20} y={158} textAnchor="middle" fill={textSecondary} fontSize="7" fontFamily="'Vazirmatn'">{label}</text>
                     </g>
                   )
                 })}

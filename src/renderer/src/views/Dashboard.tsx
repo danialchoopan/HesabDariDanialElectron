@@ -183,7 +183,7 @@ export default function Dashboard() {
   }
 
   const handleExcelExport = () => {
-    const headers = ['فاکتور', 'تاریخ', 'صندوکدار', 'مشتری', 'مبلغ', 'نوع پرداخت']
+    const headers = ['فاکتور', 'تاریخ', 'صندوقدار', 'مشتری', 'مبلغ', 'نوع پرداخت']
     const csvRows = sales.map((s: any) => [s.invoiceNumber, formatJalaliDateTime(s.createdAt), s.userName, s.customerName || '-', s.total_amount, s.paymentMethod])
     downloadExcel('sales-report.csv', headers, csvRows)
   }

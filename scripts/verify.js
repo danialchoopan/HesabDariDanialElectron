@@ -31,10 +31,11 @@ const suppliers = readFile('src/main/database/repositories/suppliers.ts');
 checks.push(['suppliers.deleteLedgerEntry reverses balance', suppliers.includes("UPDATE suppliers SET balance = balance - ? WHERE id = ?")]);
 checks.push(['suppliers.deleteLedgerEntry deletes entry', suppliers.includes("DELETE FROM supplier_ledger WHERE id = ?")]);
 
-// 5. Purchase journal: verify balance for fully-paid
+// 5. Purchase journal: verify payment goes to cash/bank and balance is preserved
 const purchases = readFile('src/main/database/repositories/purchases.ts');
-checks.push(['purchases.journal: fully-paid goes to cash', purchases.includes('پرداخت کامل فاکتور')]);
-checks.push(['purchases.journal: partial uses payable', purchases.includes('پرداخت فاکتور')]);
+checks.push(['purchases.journal: payment posts to cash/bank', purchases.includes("input.paymentMethod === 'cash' ? cashAcc : bankAcc")]);
+checks.push(['purchases.journal: paid portion credited to payment account', purchases.includes('debit: 0, credit: paidAmount')]);
+checks.push(['purchases.journal: unpaid portion stays on payable', purchases.includes('debit: 0, credit: balanceChange')]);
 
 // 6. Reports: balance sheet uses netProfit directly (not Math.abs)
 const reports = readFile('src/main/database/repositories/reports.ts');

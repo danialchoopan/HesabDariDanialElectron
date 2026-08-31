@@ -9,7 +9,10 @@ import type { ProfitLossReport, BalanceSheetReport, ARAgingReport, ARAgingRow } 
 
 function getAccountDetails(codePrefix: string, _isDebitNormal: boolean, startDate?: string, endDate?: string): { accountCode: string; accountName: string; amount: number }[] {
   const db = getDatabase()
-  let where = "WHERE a.code LIKE ? AND a.isActive = 1 AND a.parentId IS NOT NULL"
+  // Include every leaf account (any account that is not a parent grouping).
+  // parentId-null leaf accounts (e.g. supplier payables 2110, purchase discount
+  // 5300) must NOT be excluded, or the balance sheet would omit them.
+  let where = "WHERE a.code LIKE ? AND a.isActive = 1 AND NOT EXISTS (SELECT 1 FROM accounts c WHERE c.parentId = a.id)"
   const params: any[] = [codePrefix + '%']
   if (startDate) { where += ' AND je.entryDate >= ?'; params.push(startDate) }
   if (endDate) { where += ' AND je.entryDate <= ?'; params.push(endDate) }
@@ -46,9 +49,14 @@ export function generateProfitLoss(startDate?: string, endDate?: string): Profit
 }
 
 export function generateBalanceSheet(asOfDate?: string): BalanceSheetReport {
-  const getDetails = (code: string) => {
+  // Signed balances: assets are debit-normal (positive when debited),
+  // liabilities/equity are credit-normal (positive when credited). Using the
+  // SIGNED balance keeps the identity  assets == liabilities + equity  exact;
+  // taking Math.abs() per account would double-count any account that moved in
+  // the opposite direction (e.g. reduced inventory).
+  const getSigned = (code: string): { accountCode: string; accountName: string; rawBalance: number }[] => {
     const db = getDatabase()
-    let where = "WHERE a.code LIKE ? AND a.isActive = 1 AND a.parentId IS NOT NULL"
+    let where = "WHERE a.code LIKE ? AND a.isActive = 1 AND NOT EXISTS (SELECT 1 FROM accounts c WHERE c.parentId = a.id)"
     const params: any[] = [code + '%']
     if (asOfDate) { where += ' AND je.entryDate <= ?'; params.push(asOfDate) }
     return db.prepare(`
@@ -64,17 +72,14 @@ export function generateBalanceSheet(asOfDate?: string): BalanceSheetReport {
     `).all(...params) as { accountCode: string; accountName: string; rawBalance: number }[]
   }
 
-  const currentAssetRows = getDetails('1')
-  const currentAssets = currentAssetRows.map(r => ({ accountCode: r.accountCode, accountName: r.accountName, amount: Math.abs(r.rawBalance) }))
+  const currentAssets = getSigned('1').map(r => ({ accountCode: r.accountCode, accountName: r.accountName, amount: r.rawBalance }))
   const totalCurrentAssets = currentAssets.reduce((s, a) => s + a.amount, 0)
 
-  const liabRows = getDetails('2')
-  const currentLiabilities = liabRows.map(r => ({ accountCode: r.accountCode, accountName: r.accountName, amount: Math.abs(r.rawBalance) }))
+  const currentLiabilities = getSigned('2').map(r => ({ accountCode: r.accountCode, accountName: r.accountName, amount: -r.rawBalance }))
   const totalCurrentLiabilities = currentLiabilities.reduce((s, a) => s + a.amount, 0)
 
-  const equityRows = getDetails('3')
   const pl = generateProfitLoss(undefined, asOfDate)
-  const equityItems = [...equityRows.map(r => ({ accountCode: r.accountCode, accountName: r.accountName, amount: Math.abs(r.rawBalance) }))]
+  const equityItems = getSigned('3').map(r => ({ accountCode: r.accountCode, accountName: r.accountName, amount: -r.rawBalance }))
   if (pl.netProfit !== 0) equityItems.push({ accountCode: '3200', accountName: pl.netProfit >= 0 ? 'سود انباشته' : 'زیان انباشته', amount: pl.netProfit })
   const totalEquity = equityItems.reduce((s, e) => s + e.amount, 0)
 

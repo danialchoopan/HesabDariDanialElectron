@@ -280,7 +280,7 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
         <div className="md:w-1/2 flex flex-col items-center justify-center text-center relative overflow-hidden p-8 md:py-12 flex-shrink-0" style={{ background: brandBg }}>
           <div className="z-10 flex flex-col items-center gap-6">
             <LogoIcon size={128} />
-            <h1 className="text-4xl font-bold tracking-tight" style={{ color: setupColors.primary, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+            <h1 className="text-4xl font-bold tracking-tight" style={{ color: setupColors.primary, fontFamily: "'Vazirmatn', sans-serif" }}>
               {ui.app.title}
             </h1>
             <p className="text-lg max-w-sm" style={{ color: subtitleColor, fontFamily: "'Noto Sans', sans-serif" }}>
@@ -327,7 +327,7 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
           {step === 1 ? (
             <>
               <div className="mb-8">
-                <h2 className="text-2xl font-semibold mb-1" style={{ color: titleColor, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+                <h2 className="text-2xl font-semibold mb-1" style={{ color: titleColor, fontFamily: "'Vazirmatn', sans-serif" }}>
                   {lang === 'fa' ? 'اطلاعات فروشگاه' : 'Store Information'}
                 </h2>
                 <p className="text-sm" style={{ color: subtitleColor, opacity: 0.7 }}>
@@ -556,7 +556,7 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
                 style={{ 
                   background: setupColors.primary, 
                   color: setupColors.onPrimary, 
-                  fontFamily: "'IBM Plex Sans', sans-serif", 
+                  fontFamily: "'Vazirmatn', sans-serif", 
                   boxShadow: '0 4px 16px rgba(0,97,148,0.3)',
                   transition: 'all 0.2s ease'
                 }}
@@ -578,7 +578,7 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
                       <polyline points="15 18 9 12 15 6" />
                     </svg>
                   </button>
-                  <h2 className="text-2xl font-semibold" style={{ color: titleColor, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+                  <h2 className="text-2xl font-semibold" style={{ color: titleColor, fontFamily: "'Vazirmatn', sans-serif" }}>
                     {lang === 'fa' ? 'تنظیم رمز عبور' : 'Set Password'}
                   </h2>
                 </div>
@@ -711,7 +711,7 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
                 style={{ 
                   background: setupColors.primary, 
                   color: setupColors.onPrimary, 
-                  fontFamily: "'IBM Plex Sans', sans-serif", 
+                  fontFamily: "'Vazirmatn', sans-serif", 
                   boxShadow: '0 4px 16px rgba(0,97,148,0.3)',
                   transition: 'all 0.2s ease'
                 }}

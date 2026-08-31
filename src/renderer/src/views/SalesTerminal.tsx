@@ -289,7 +289,7 @@ export default function SalesTerminal() {
             let html = ''
             if (customerName) html += `<div style="font-size:11pt;margin-bottom:4px"><strong>مشتری:</strong> ${customerName}</div>`
             html += `<div class="header-info"><span>شماره فاکتور: ${saleComplete.invoiceNumber}</span><span>تاریخ: ${formatJalaliDateTime(saleComplete.createdAt || '')}</span></div>`
-            html += `<div class="header-info"><span>صندوکدار: ${user?.name || ''}</span><span>نوع پرداخت: ${saleComplete.paymentMethod === 'cash' ? 'نقدی' : saleComplete.paymentMethod === 'card' ? 'کارتی' : 'بدهی'}</span></div>`
+            html += `<div class="header-info"><span>صندوق دار: ${user?.name || ''}</span><span>نوع پرداخت: ${saleComplete.paymentMethod === 'cash' ? 'نقدی' : saleComplete.paymentMethod === 'card' ? 'کارتی' : 'بدهی'}</span></div>`
             if (saleDesc) html += `<div style="padding:6px 8px;margin:4px 0;font-size:9pt;background:#f0f4f8;border-radius:4px;color:#333">${saleDesc}</div>`
             html += '<table><thead><tr><th>کالا</th><th>تعداد</th><th>قیمت واحد</th><th>جمع</th></tr></thead><tbody>'
             saleComplete.items?.forEach((item: any) => { html += `<tr><td>${item.productTitle}</td><td>${item.quantity}</td><td>${item.unitPrice.toLocaleString('fa-IR')}</td><td>${item.subtotal.toLocaleString('fa-IR')}</td></tr>` })
