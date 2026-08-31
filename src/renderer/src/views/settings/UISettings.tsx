@@ -11,6 +11,7 @@
  *   - Navigation customization: reorder, enable/disable nav items, reset defaults
  */
 
+import { useState, useEffect } from 'react'
 import { t, setLanguage } from '../../i18n'
 import { useSettingsStore, type NavTheme } from '../../store/settingsStore'
 import { useTheme } from '../../hooks/useTheme'
@@ -40,6 +41,14 @@ export default function UISettings() {
   const cBorder = colors.border.default
   const tPri = colors.text.primary
   const tSec = colors.text.secondary
+  const [checkUpdatesOnStart, setCheckUpdatesOnStart] = useState(true)
+
+  // Load the persisted "check updates on start" preference so the toggle reflects it
+  useEffect(() => {
+    window.api.settings.get('checkUpdatesOnStart').then((r) => {
+      if (r.success && r.data) setCheckUpdatesOnStart(r.data !== 'false')
+    })
+  }, [])
 
   const moveItem = (index: number, direction: -1 | 1) => {
     const newConfig = [...navConfig]
@@ -182,14 +191,14 @@ export default function UISettings() {
               <p className="text-[10px] mt-0.5" style={{ color: colors.text.muted }}>در صورت وجود نسخه جدید در GitHub اطلاع‌رسانی می‌شود</p>
             </div>
             <button onClick={async () => {
-              const current = await window.api.settings.get('checkUpdatesOnStart')
-              const newVal = current.data === 'false' ? 'true' : 'false'
-              await window.api.settings.set('checkUpdatesOnStart', newVal)
+              const newVal = !checkUpdatesOnStart
+              setCheckUpdatesOnStart(newVal)
+              await window.api.settings.set('checkUpdatesOnStart', String(newVal))
             }}
               className="relative w-11 h-6 rounded-full transition-all duration-200"
-              style={{ backgroundColor: colors.toggle.track }}>
+              style={{ backgroundColor: checkUpdatesOnStart ? primary : colors.toggle.track }}>
               <div className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all duration-200"
-                style={{ left: '2px' }} />
+                style={{ left: checkUpdatesOnStart ? '22px' : '2px' }} />
             </button>
           </div>
         </Card>

@@ -2,14 +2,19 @@
  * Backup module — handles database backup, restore, integrity checks,
  * and auto-backup scheduling. Backups are stored as .db files with
  * .meta.json sidecar containing hash, size, version, and table stats.
+ *
+ * WAL safety: the app runs in SQLite WAL mode, so a raw copy of pos.db alone
+ * can MISS recent transactions (they live in pos.db-wal). Every snapshot
+ * therefore runs `wal_checkpoint(TRUNCATE)` first, then copies ONLY the main
+ * .db file which is now fully consistent and self-contained.
  */
 
 import { app } from 'electron'
-import Database from 'better-sqlite3'
 import { join } from 'path'
 import { copyFileSync, existsSync, readdirSync, unlinkSync, statSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { createHash } from 'crypto'
 import { closeDatabase, getDatabase } from './connection'
+import { runMigrations, validateAfterMigration } from './schemaMigration'
 
 const BACKUP_DIR = join(app.getPath('userData'), 'backups')
 const DB_PATH = join(app.getPath('userData'), 'pos.db')
@@ -25,36 +30,72 @@ function fileHash(filePath: string): string {
   return createHash('sha256').update(data).digest('hex')
 }
 
+/**
+ * Checkpoint the WAL into the main database file so a subsequent raw copy is
+ * fully consistent. Best-effort: if the connection is not open this is a no-op.
+ */
+function checkpointWal(): void {
+  try {
+    const liveDb = getDatabase()
+    liveDb.pragma('wal_checkpoint(TRUNCATE)')
+  } catch (e) {
+    console.warn('[Backup] WAL checkpoint failed:', e)
+  }
+}
+
+/**
+ * Write a consistent, self-contained copy of the live database to `dest`.
+ * Checkpoints WAL first, then copies only the .db (WAL/SHM are NOT copied —
+ * after a TRUNCATE checkpoint the main file already contains all data).
+ */
+export function copyDatabaseTo(dest: string): void {
+  ensureBackupDir()
+  checkpointWal()
+  copyFileSync(DB_PATH, dest)
+  // Drop any stale sidecar files for the destination (from a previous attempt)
+  for (const suffix of ['-wal', '-shm']) {
+    const p = dest + suffix
+    if (existsSync(p)) unlinkSync(p)
+  }
+}
+
+/**
+ * Remove stale WAL/SHM files of the live DB. Called after restoring a backup
+ * so the restored (self-contained) main file is not mixed with old frames.
+ */
+function removeLiveWalShm(): void {
+  for (const p of [WAL_PATH, SHM_PATH]) {
+    try { if (existsSync(p)) unlinkSync(p) } catch (e) { console.warn('[Backup] Failed to remove', p, e) }
+  }
+}
+
 export function createBackup(label?: string): { success: boolean; path?: string; hash?: string; size?: number; error?: string } {
   try {
     ensureBackupDir()
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
     const name = label ? `${label}-${timestamp}` : `backup-${timestamp}`
     const dbCopy = join(BACKUP_DIR, `${name}.db`)
-    const walCopy = join(BACKUP_DIR, `${name}.db-wal`)
-    const shmCopy = join(BACKUP_DIR, `${name}.db-shm`)
 
-    // Checkpoint WAL into main DB before copying for atomic consistency
-    try {
-      const liveDb = getDatabase()
-      liveDb.pragma('wal_checkpoint(TRUNCATE)')
-    } catch (e) {
-      console.warn('[Backup] WAL checkpoint failed:', e)
-    }
-
-    copyFileSync(DB_PATH, dbCopy)
-    if (existsSync(WAL_PATH)) copyFileSync(WAL_PATH, walCopy)
-    if (existsSync(SHM_PATH)) copyFileSync(SHM_PATH, shmCopy)
+    copyDatabaseTo(dbCopy)
 
     const hash = fileHash(dbCopy)
     const size = statSync(dbCopy).size
 
-    const meta = { name, hash, size, timestamp: new Date().toISOString(), appVersion: app.getVersion(), label: label || 'auto', tables: getTableStats() }
+    const meta = { name, hash, size, timestamp: new Date().toISOString(), appVersion: app.getVersion(), schemaVersion: getSchemaVersionSafe(), label: label || 'auto', tables: getTableStats() }
     writeFileSync(join(BACKUP_DIR, `${name}.meta.json`), JSON.stringify(meta, null, 2))
 
     return { success: true, path: dbCopy, hash, size }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+function getSchemaVersionSafe(): string {
+  try {
+    const row = getDatabase().prepare("SELECT value FROM settings WHERE key = 'schemaVersion'").get() as { value: string } | undefined
+    return row?.value || 'unknown'
+  } catch {
+    return 'unknown'
   }
 }
 
@@ -85,102 +126,69 @@ export function checkIntegrity(dbPath?: string): { success: boolean; integrityCh
 export function verifyBackup(backupPath: string): { success: boolean; hashMatch?: boolean; error?: string } {
   try {
     if (!existsSync(backupPath)) return { success: false, error: 'Backup file not found' }
+    // The file must at least pass SQLite integrity before trusting it
+    const integrity = checkIntegrity(backupPath)
+    if (!integrity.success) return { success: false, error: `Backup failed integrity check: ${integrity.error || integrity.integrityCheck}` }
     const backupHash = fileHash(backupPath)
-    // Compare against the hash stored in .meta.json, not the live DB
+    // Compare against the hash stored in .meta.json
     const metaPath = backupPath.replace('.db', '.meta.json')
     if (existsSync(metaPath)) {
       const meta = JSON.parse(readFileSync(metaPath, 'utf-8'))
       return { success: true, hashMatch: backupHash === meta.hash }
     }
-    return { success: true, hashMatch: true }
+    // No sidecar meta (e.g. exported .db from backup:export) — the file is
+    // structurally valid but there is no recorded hash to compare against.
+    return { success: true, hashMatch: undefined }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) }
   }
 }
 
-export function restoreBackup(backupPath: string): { success: boolean; error?: string } {
+export function restoreBackup(backupPath: string): { success: boolean; error?: string; message?: string; restoredVersion?: string } {
   try {
     if (!existsSync(backupPath)) return { success: false, error: 'Backup file not found' }
 
+    // 1. Integrity — never trust a corrupt file
     const check = checkIntegrity(backupPath)
     if (!check.success) return { success: false, error: `Backup integrity failed: ${check.error || check.integrityCheck}` }
 
-    createBackup('pre-restore')
+    // 2. Optional hash verification against sidecar meta (only a warning —
+    //    a missing sidecar is fine for hand-exported .db files)
+    const verify = verifyBackup(backupPath)
+    if (!verify.success) return { success: false, error: verify.error }
 
-    // Close the database connection before overwriting the file
-    closeDatabase()
-
-    copyFileSync(backupPath, DB_PATH)
-
-    const walPath = backupPath.replace('.db', '.db-wal')
-    const shmPath = backupPath.replace('.db', '.db-shm')
-    if (existsSync(walPath)) copyFileSync(walPath, WAL_PATH)
-    if (existsSync(shmPath)) copyFileSync(shmPath, SHM_PATH)
-
-    // Re-open the restored database and run auto-migration
-    // Adds missing columns/tables so old backups (v1.0+) are schema-compatible
-    try {
-      const restoredDb = new Database(DB_PATH)
-      // Re-run the same auto-migration that runs on normal startup
-      const expectedColumns: Record<string, { name: string; type: string; defaultValue: string }[]> = {
-        products: [
-          { name: 'subcategory', type: 'TEXT', defaultValue: "''" },
-          { name: 'isSellable', type: 'INTEGER', defaultValue: '1' },
-          { name: 'expiry_date', type: 'TEXT', defaultValue: "''" },
-          { name: 'expiry_alert_days', type: 'INTEGER', defaultValue: '30' },
-          { name: 'last_alerted', type: 'INTEGER', defaultValue: '0' },
-          { name: 'has_expiry', type: 'INTEGER', defaultValue: '0' },
-          { name: 'brand_id', type: 'INTEGER', defaultValue: 'NULL' },
-          { name: 'profit_percentage', type: 'REAL', defaultValue: '0' },
-        ],
-        sales: [
-          { name: 'saleDate', type: 'TEXT', defaultValue: "datetime('now', 'localtime')" },
-          { name: 'affectsInventory', type: 'INTEGER', defaultValue: '1' },
-        ],
-        customers: [
-          { name: 'is_blocked', type: 'INTEGER', defaultValue: '0' },
-        ],
-        users: [
-          { name: 'permissions', type: 'TEXT', defaultValue: "'{}'" },
-          { name: 'lastLoginAt', type: 'TEXT', defaultValue: "''" },
-          { name: 'lastActivityAt', type: 'TEXT', defaultValue: "''" },
-        ],
-        returns: [
-          { name: 'isDamaged', type: 'INTEGER', defaultValue: '0' },
-        ],
-        audit_log: [
-          { name: 'userName', type: 'TEXT', defaultValue: "''" },
-          { name: 'beforeValue', type: 'TEXT', defaultValue: "''" },
-          { name: 'afterValue', type: 'TEXT', defaultValue: "''" },
-          { name: 'ip', type: 'TEXT', defaultValue: "''" },
-        ],
-      }
-      for (const [tableName, columns] of Object.entries(expectedColumns)) {
-        try {
-          const existing = restoredDb.prepare(`PRAGMA table_info(${tableName})`).all() as { name: string }[]
-          const existingNames = new Set(existing.map(c => c.name))
-          for (const col of columns) {
-            if (!existingNames.has(col.name)) {
-              restoredDb.exec(`ALTER TABLE ${tableName} ADD COLUMN ${col.name} ${col.type} DEFAULT ${col.defaultValue}`)
-            }
-          }
-        } catch {}
-      }
-      // Ensure brands table exists
+    // 3. Version compatibility — warn when restoring something newer/unknown
+    let backupVersion = 'unknown'
+    const metaPath = backupPath.replace('.db', '.meta.json')
+    if (existsSync(metaPath)) {
       try {
-        restoredDb.exec("CREATE TABLE IF NOT EXISTS brands (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, description TEXT DEFAULT '', isActive INTEGER NOT NULL DEFAULT 1, createdAt TEXT NOT NULL DEFAULT (datetime('now','localtime')))")
+        const meta = JSON.parse(readFileSync(metaPath, 'utf-8'))
+        backupVersion = meta.appVersion || 'unknown'
       } catch {}
-      // Ensure supplier_ledger table exists
-      try {
-        restoredDb.exec("CREATE TABLE IF NOT EXISTS supplier_ledger (id INTEGER PRIMARY KEY AUTOINCREMENT, supplierId INTEGER NOT NULL, type TEXT NOT NULL, amount REAL NOT NULL, description TEXT DEFAULT '', images TEXT DEFAULT '[]', createdAt TEXT NOT NULL DEFAULT (datetime('now','localtime')))")
-      } catch {}
-      restoredDb.close()
-      console.log('[Backup] Auto-migration completed on restored database')
-    } catch (e) {
-      console.warn('[Backup] Auto-migration on restored DB failed:', e)
     }
 
-    return { success: true }
+    // 4. Pre-restore safety backup of the CURRENT database
+    createBackup('pre-restore')
+
+    // 5. Close, replace, clean stale WAL/SHM
+    closeDatabase()
+    copyFileSync(backupPath, DB_PATH)
+    removeLiveWalShm()
+
+    // 6. Re-open via the normal path (runs initializeDatabase + migrateSchema),
+    //    then run versioned migrations and validate the result.
+    getDatabase()
+    const mig = runMigrations()
+    const validation = validateAfterMigration()
+
+    if (!validation.valid) {
+      return { success: false, error: `بازیابی انجام شد اما یکپارچگی داده تأیید نشد: ${validation.issues.join('; ')}`, message: 'یکپارچگی داده تأیید نشد' }
+    }
+    if (mig.errors.length > 0) {
+      return { success: true, message: `بازیابی موفق، اما مهاجرت دیتابیس خطا داشت: ${mig.errors.join('; ')}`, restoredVersion: backupVersion }
+    }
+
+    return { success: true, message: 'بازیابی با موفقیت انجام شد', restoredVersion: backupVersion }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) }
   }
@@ -243,22 +251,15 @@ export function getBackupDetails(backupPath: string): { success: boolean; data?:
   }
 }
 
-export function autoBackup(): { created: boolean; path?: string } {
-  ensureBackupDir()
-  const today = new Date().toISOString().slice(0, 10)
-  const existing = readdirSync(BACKUP_DIR).filter(f => f.includes(today))
-  if (existing.length > 0) return { created: false }
-  const result = createBackup('auto')
-  return { created: result.success, path: result.path }
-}
-
 export function cleanupBackups(keepCount: number = 30): { deleted: number } {
   ensureBackupDir()
   const backups = readdirSync(BACKUP_DIR).filter(f => f.endsWith('.meta.json'))
   if (backups.length <= keepCount) return { deleted: 0 }
-  const sorted = backups.sort().reverse()
+  const sorted = backups
+    .map(f => ({ f, mtime: (() => { try { return statSync(join(BACKUP_DIR, f)).mtimeMs } catch { return 0 } })() }))
+    .sort((a, b) => b.mtime - a.mtime)
   const toDelete = sorted.slice(keepCount)
-  for (const f of toDelete) {
+  for (const { f } of toDelete) {
     const name = f.replace('.meta.json', '')
     try {
       unlinkSync(join(BACKUP_DIR, `${name}.db`))
@@ -276,8 +277,41 @@ export function getBackupStats(): { totalBackups: number; latestBackup: string |
   ensureBackupDir()
   const files = readdirSync(BACKUP_DIR).filter(f => f.endsWith('.db'))
   const totalSize = files.reduce((sum, f) => sum + statSync(join(BACKUP_DIR, f)).size, 0)
-  const latest = files.sort().pop() || null
+  const latest = files.length > 0
+    ? files.map(f => ({ name: f, mtime: statSync(join(BACKUP_DIR, f)).mtimeMs })).sort((a, b) => b.mtime - a.mtime)[0].name
+    : null
   return { totalBackups: files.length, latestBackup: latest, totalSize }
+}
+
+/**
+ * Daily auto-backup honoring the autoBackupInterval setting.
+ * Returns { created, path, reason } where reason explains why a backup was
+ * skipped (already-today for daily, within-week for weekly, etc.).
+ */
+export function autoBackup(): { created: boolean; path?: string; reason?: string } {
+  ensureBackupDir()
+  const interval = (() => {
+    try {
+      const v = getDatabase().prepare("SELECT value FROM settings WHERE key = 'autoBackupInterval'").get() as { value: string } | undefined
+      return v?.value || 'daily'
+    } catch { return 'daily' }
+  })()
+
+  const now = new Date()
+  const backups = readdirSync(BACKUP_DIR).filter(f => f.endsWith('.db')).map(f => {
+    try { return statSync(join(BACKUP_DIR, f)).mtime } catch { return new Date(0) }
+  })
+  const latest = backups.length > 0 ? new Date(Math.max(...backups.map(d => d.getTime()))) : null
+
+  if (latest) {
+    const dayDiff = Math.floor((now.getTime() - latest.getTime()) / 86400000)
+    if (interval === 'weekly' && dayDiff < 7) return { created: false, reason: 'weekly-backup-exists' }
+    if (interval === 'monthly' && dayDiff < 30) return { created: false, reason: 'monthly-backup-exists' }
+    if (dayDiff < 1) return { created: false, reason: 'daily-backup-exists' }
+  }
+
+  const result = createBackup('auto')
+  return { created: result.success, path: result.path, reason: result.success ? 'created' : 'error' }
 }
 
 /**

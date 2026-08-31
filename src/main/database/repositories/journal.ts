@@ -128,23 +128,33 @@ export function postExpenseJournal(expenseId: number, expenseDate: string, amoun
 /**
  * Auto-posts a journal entry for a product return. The 4-line reversal:
  *   1. Debit  Sales revenue (4100) — reverses the original sale revenue
- *   2. Credit Cash (1100) — refund leaves the business
+ *   2. Credit Receive account (cash=1100, bank=1200, or A/R=1400) — matches the
+ *      original sale's payment method so receivable/cash reverses correctly
  *   3. Debit  Inventory (1300) — stock value returns (if cogsAmount > 0)
  *   4. Credit COGS (5100) — cost of goods sold is reversed (if cogsAmount > 0)
  *
  * Lines 3-4 are conditional: only posted when there's a COGS amount to reverse,
  * which means the original sale affected inventory.
  */
-export function postReturnJournal(returnId: number, returnDate: string, refundAmount: number, cogsAmount: number = 0): void {
+export function postReturnJournal(returnId: number, returnDate: string, refundAmount: number, cogsAmount: number = 0, originalPaymentMethod?: string): void {
   const cashAcct = getAccountByCode('1100')
+  const bankAcct = getAccountByCode('1200')
+  const arAcct = getAccountByCode('1400')
   const salesAcct = getAccountByCode('4100')
   if (!cashAcct || !salesAcct) {
     console.error('[Journal] Missing account codes for return journal'); return
   }
 
+  // Refund goes back through the same channel the customer paid with.
+  const refundAccount = originalPaymentMethod === 'ledger' && arAcct
+    ? arAcct
+    : originalPaymentMethod === 'card' && bankAcct
+      ? bankAcct
+      : cashAcct
+
   const lines: { accountId: number; debit: number; credit: number; description: string }[] = [
     { accountId: salesAcct.id, debit: refundAmount, credit: 0, description: 'کاهش درآمد' },
-    { accountId: cashAcct.id, debit: 0, credit: refundAmount, description: 'بازپرداخت وجه' },
+    { accountId: refundAccount.id, debit: 0, credit: refundAmount, description: 'بازپرداخت وجه' },
   ]
 
   // Reverse COGS/inventory if we have the cost amount

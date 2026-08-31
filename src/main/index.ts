@@ -6,7 +6,7 @@ import { readFileSync } from 'fs'
 import { appendFileSync } from 'fs'
 // import { seedDatabase } from './database/seed' // disabled
 import { autoBackup } from './database/backup'
-import { runMigrations, getSchemaVersion } from './database/schemaMigration'
+import { runMigrations, getSchemaVersion, compareVersions } from './database/schemaMigration'
 import * as settingsRepo from './database/repositories/settings'
 
 let mainWindow: BrowserWindow | null = null
@@ -100,10 +100,10 @@ app.whenReady().then(async () => {
     }
     registerAllHandlers()
 
-    // Check for downgrade: DB version > app version
+    // Check for downgrade: DB schema version > app version (numeric semver compare)
     const appVersion = app.getVersion()
     const dbVersion = getSchemaVersion()
-    if (dbVersion > appVersion) {
+    if (compareVersions(dbVersion, appVersion) > 0) {
       const result = dialog.showMessageBoxSync({
         type: 'warning',
         title: 'هشدار: نسخه قدیمی‌تر',

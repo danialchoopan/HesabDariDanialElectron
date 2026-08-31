@@ -185,9 +185,11 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   init: async () => {
     const result = await window.api.settings.getAll()
     if (result.success && result.data) {
-      const theme = (result.data.theme as Theme) || 'dark'
-      const language = (result.data.language as 'fa' | 'en') || 'fa'
-      const navTheme = (result.data.navTheme as NavTheme) || 'blue'
+      const VALID_NAV = ['blue', 'green', 'purple', 'orange', 'teal', 'slate']
+      // Guard against corrupt/invalid persisted values (would crash useTheme otherwise)
+      const theme = result.data.theme === 'light' ? 'light' : 'dark'
+      const language = (result.data.language === 'en' ? 'en' : 'fa') as 'fa' | 'en'
+      const navTheme = (VALID_NAV.includes(result.data.navTheme) ? result.data.navTheme : 'blue') as NavTheme
       const fontSize = result.data.fontSize || 'md'
       const fontSizeCustom = parseFloat(result.data.fontSizeCustom) || 1
       const highContrast = result.data.highContrast === 'true'

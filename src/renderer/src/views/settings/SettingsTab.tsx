@@ -35,6 +35,7 @@ export default function SettingsTab({ onExport, onImport }: Props) {
   const [storeAddress, setStoreAddress] = useState('')
   const [storePhone, setStorePhone] = useState('')
   const [saved, setSaved] = useState(false)
+  const [appVersion, setAppVersion] = useState('')
   const { isDark } = useTheme()
 
   const tPri = isDark ? '#f1f5f9' : '#0f172a'
@@ -49,6 +50,9 @@ export default function SettingsTab({ onExport, onImport }: Props) {
         setStoreAddress(r.data.storeAddress ?? '')
         setStorePhone(r.data.storePhone ?? '')
       }
+    })
+    window.api.system.getVersion().then((r) => {
+      if (r.success && r.data) setAppVersion(r.data)
     })
   }, [])
 
@@ -91,7 +95,7 @@ export default function SettingsTab({ onExport, onImport }: Props) {
           {/* Version Info */}
           <div className="rounded-xl p-3 flex items-center justify-between" style={{ backgroundColor: isDark ? '#0f172a' : '#f8fafc', border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
             <span className="text-xs font-bold" style={{ color: tSec }}>نسخه برنامه</span>
-            <span className="text-xs font-bold px-2 py-0.5 rounded" style={{ backgroundColor: `${primary}15`, color: primary }}>v1.10.0</span>
+            <span className="text-xs font-bold px-2 py-0.5 rounded" style={{ backgroundColor: `${primary}15`, color: primary }}>v{appVersion || '…'}</span>
           </div>
         </div>
 

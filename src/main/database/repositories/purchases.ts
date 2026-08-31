@@ -96,9 +96,10 @@ export function createPurchase(input: PurchaseInput): Purchase {
       updateStock.run(item.quantity, item.unitCost, item.productId)
     }
 
-    if (balanceChange > 0) {
-      updateSupplierBalance(input.supplierId, balanceChange)
-      addSupplierLedgerEntry(input.supplierId, purchaseId, 'purchase', balanceChange, `خرید فاکتور ${invoiceNumber}`)
+    // Full purchase amount is owed to the supplier; any payment reduces that debt.
+    if (totalAmount > 0) {
+      updateSupplierBalance(input.supplierId, totalAmount)
+      addSupplierLedgerEntry(input.supplierId, purchaseId, 'purchase', totalAmount, `خرید فاکتور ${invoiceNumber}`)
     }
 
     if (paidAmount > 0) {
@@ -116,31 +117,25 @@ export function createPurchase(input: PurchaseInput): Purchase {
   const payableAcc = getAccountByCode('2110')
   const bankAcc = getAccountByCode('1200')
   const cashAcc = getAccountByCode('1100')
-  const cogsAcc = getAccountByCode('5200')
 
-  if (inventoryAcc && cogsAcc) {
+  // Goods + capitalized tax go into inventory; discount reduces cost;
+  // the paid portion leaves cash/bank, the unpaid portion stays as payable.
+  if (inventoryAcc) {
     lines.push({ accountId: inventoryAcc.id, debit: subtotal, credit: 0, description: `خرید کالا ${invoiceNumber}` })
-  }
-  if (input.taxAmount && input.taxAmount > 0) {
-    lines.push({ accountId: inventoryAcc?.id || 0, debit: input.taxAmount, credit: 0, description: `مالیات خرید ${invoiceNumber}` })
+    if (input.taxAmount && input.taxAmount > 0) {
+      lines.push({ accountId: inventoryAcc.id, debit: input.taxAmount, credit: 0, description: `مالیات خرید ${invoiceNumber}` })
+    }
   }
   if (input.discountAmount && input.discountAmount > 0) {
     const discountAcc = getAccountByCode('5300')
     if (discountAcc) lines.push({ accountId: discountAcc.id, debit: 0, credit: input.discountAmount, description: `تخفیف خرید ${invoiceNumber}` })
   }
-  if (payableAcc) {
-    if (paidAmount > 0) {
-      const payAcc = input.paymentMethod === 'cash' ? cashAcc : bankAcc
-      if (payAcc && balanceChange > 0) {
-        lines.push({ accountId: payableAcc.id, debit: paidAmount, credit: 0, description: `پرداخت فاکتور ${invoiceNumber}` })
-        lines.push({ accountId: payAcc.id, debit: 0, credit: paidAmount, description: `پرداخت فاکتور ${invoiceNumber}` })
-      } else if (payAcc) {
-        lines.push({ accountId: payAcc.id, debit: 0, credit: totalAmount, description: `پرداخت کامل فاکتور ${invoiceNumber}` })
-      }
-    }
-    if (balanceChange > 0) {
-      lines.push({ accountId: payableAcc.id, debit: 0, credit: balanceChange, description: `بدهی به تأمین\u200cکننده ${invoiceNumber}` })
-    }
+  if (paidAmount > 0) {
+    const payAcc = input.paymentMethod === 'cash' ? cashAcc : bankAcc
+    if (payAcc) lines.push({ accountId: payAcc.id, debit: 0, credit: paidAmount, description: `پرداخت فاکتور ${invoiceNumber}` })
+  }
+  if (balanceChange > 0 && payableAcc) {
+    lines.push({ accountId: payableAcc.id, debit: 0, credit: balanceChange, description: `بدهی به تأمین\u200cکننده ${invoiceNumber}` })
   }
 
   if (lines.length > 0) {

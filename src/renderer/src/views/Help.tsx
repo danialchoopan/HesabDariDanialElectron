@@ -10,19 +10,35 @@ export default function Help() {
   const { shortcuts } = useShortcutsStore()
   const [updateInfo, setUpdateInfo] = useState<any>(null)
   const [checkingUpdate, setCheckingUpdate] = useState(false)
-  const appVersion = typeof window !== 'undefined' ? (window as any).electron?.app?.getVersion?.() || '1.10.0' : '1.10.0'
+  const [checkError, setCheckError] = useState<string | null>(null)
+  const [appVersion, setAppVersion] = useState('')
 
   const tPri = colors.text.primary
   const tSec = colors.text.secondary
   const cardBg = colors.bg.card
   const cardBorder = colors.border.default
 
+  useEffect(() => {
+    window.api.system.getVersion().then((r) => {
+      if (r.success && r.data) setAppVersion(r.data)
+    })
+  }, [])
+
   const checkForUpdate = async () => {
     setCheckingUpdate(true)
+    setCheckError(null)
     try {
       const r = await window.api.system.checkUpdate()
-      if (r.success && r.data) setUpdateInfo(r.data)
-    } catch {}
+      if (r.success && r.data) {
+        setUpdateInfo(r.data)
+      } else {
+        setUpdateInfo(null)
+        setCheckError(r.error || 'خطا در بررسی نسخه')
+      }
+    } catch {
+      setUpdateInfo(null)
+      setCheckError('خطا در بررسی نسخه')
+    }
     setCheckingUpdate(false)
   }
 
@@ -108,6 +124,39 @@ export default function Help() {
         'خروجی اکسل از تمام گزارش‌ها',
       ],
     },
+    {
+      title: 'تأمین‌کنندگان و خرید',
+      color: '#14b8a6',
+      icon: <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="#14b8a6" strokeWidth="2"><rect x="1" y="3" width="15" height="13" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>,
+      items: [
+        'ثبت خرید از تأمین‌کنندگان',
+        'مدیریت بدهی و پرداخت تأمین‌کننده',
+        'برگشت خرید و اصلاح موجودی',
+        'دفتر معاملات تأمین‌کنندگان',
+      ],
+    },
+    {
+      title: 'خدمات و تعمیرات',
+      color: '#f97316',
+      icon: <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" /></svg>,
+      items: [
+        'ثبت تیکت خدمات و گارانتی',
+        'پیگیری وضعیت تعمیر',
+        'محاسبه هزینه قطعات و دستمزد',
+        'بازگشت به مشتری پس از تکمیل',
+      ],
+    },
+    {
+      title: 'حساب‌های بانکی و کارمندان',
+      color: '#0ea5e9',
+      icon: <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" strokeWidth="2"><path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3" /></svg>,
+      items: [
+        'مدیریت حساب‌های بانکی و تراکنش‌ها',
+        'پرونده کارمندان و اطلاعات شغلی',
+        'پرداخت حقوق با کسر مالیات و بیمه',
+        'تاریخچه پرداخت حقوق',
+      ],
+    },
   ]
 
   return (
@@ -158,6 +207,14 @@ export default function Help() {
         <div className="mb-4 p-3 rounded-xl flex items-center gap-2" style={{ backgroundColor: colors.bg.tertiary, border: `1px solid ${cardBorder}` }}>
           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
           <span className="text-xs font-bold" style={{ color: '#22c55e' }}>شما از آخرین نسخه استفاده می‌کنید</span>
+        </div>
+      )}
+
+      {checkError && (
+        <div className="mb-4 p-3 rounded-xl flex items-center gap-2" style={{ backgroundColor: isDark ? '#2a1a1a' : '#fee2e2', border: `1px solid ${isDark ? '#7f1d1d' : '#fecaca'}` }}>
+          <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span className="text-xs font-bold" style={{ color: '#ef4444' }}>{checkError}</span>
+          <button onClick={checkForUpdate} className="mr-auto px-3 py-1 rounded-lg text-[10px] font-bold" style={{ backgroundColor: colors.bg.tertiary, color: tSec }}>تلاش مجدد</button>
         </div>
       )}
 

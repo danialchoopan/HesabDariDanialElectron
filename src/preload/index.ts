@@ -47,6 +47,8 @@ const api = {
       ipcRenderer.invoke('system:isFirstRun'),
     checkUpdate: (): Promise<IPCResponse<any>> =>
       ipcRenderer.invoke('system:checkUpdate'),
+    getVersion: (): Promise<IPCResponse<string>> =>
+      ipcRenderer.invoke('system:getVersion'),
   },
 
   auth: {
@@ -239,6 +241,7 @@ const api = {
     getById: (id: number): Promise<IPCResponse<any>> => ipcRenderer.invoke('restorePoints:getById', { id }),
     delete: (id: number): Promise<IPCResponse<any>> => ipcRenderer.invoke('restorePoints:delete', { id }),
     verify: (id: number): Promise<IPCResponse<any>> => ipcRenderer.invoke('restorePoints:verify', { id }),
+    restore: (id: number): Promise<IPCResponse<any>> => ipcRenderer.invoke('restorePoints:restore', { id }),
     cleanup: (keepCount?: number): Promise<IPCResponse<any>> => ipcRenderer.invoke('restorePoints:cleanup', { keepCount }),
     getStats: (): Promise<IPCResponse<any>> => ipcRenderer.invoke('restorePoints:stats'),
   },

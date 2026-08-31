@@ -33,7 +33,7 @@ export function createSale(input: SaleInput): Sale {
     rawSubtotal += calculateLineSubtotal(item.unitPrice, item.quantity)
   }
 
-  const total_amount = roundToNearest(rawSubtotal, roundTo)
+  const total_amount = roundToNearest(rawSubtotal, roundTo) + (input.shippingCost || 0)
 
   const changeAmount = input.paymentMethod === 'cash'
     ? Math.max(0, input.customerPaid - total_amount)
@@ -71,7 +71,7 @@ export function createSale(input: SaleInput): Sale {
       }
     }
 
-    db.prepare('UPDATE sales SET totalNetProfit = ? WHERE id = ?').run(invoiceNetProfit, saleId)
+    db.prepare('UPDATE sales SET totalNetProfit = ? WHERE id = ?').run(invoiceNetProfit + (input.shippingCost || 0), saleId)
 
     if (input.paymentMethod === 'ledger' && input.customerId) {
       updateCustomerBalance(input.customerId, -total_amount)

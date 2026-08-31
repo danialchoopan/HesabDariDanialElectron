@@ -43,7 +43,17 @@ export function createReturn(saleId: number, userId: number, productId: number, 
     const cogsAmount = saleItem ? saleItem.purchasePrice * quantity : 0
     // Reduce sale total by refund; reduce profit by (refund - cogs) since COGS is also reversed
     db.prepare('UPDATE sales SET total_amount = total_amount - ?, totalNetProfit = totalNetProfit - ? WHERE id = ?').run(refundAmount, refundAmount - cogsAmount, saleId)
-    postReturnJournal(returnId, new Date().toISOString().slice(0, 10), refundAmount, cogsAmount)
+
+    // If the original sale was on credit (ledger), reverse the customer's debt so
+    // the customer balance stays consistent with the returned goods.
+    const saleRow = db.prepare('SELECT paymentMethod, customerId FROM sales WHERE id = ?').get(saleId) as { paymentMethod?: string; customerId?: number } | undefined
+    if (saleRow?.paymentMethod === 'ledger' && saleRow.customerId) {
+      db.prepare('UPDATE customers SET balance = balance + ? WHERE id = ?').run(refundAmount, saleRow.customerId)
+      db.prepare("INSERT INTO customer_ledger (customerId, saleId, type, amount, description, images) VALUES (?, ?, 'payment', ?, ?, '[]')")
+        .run(saleRow.customerId, saleId, refundAmount, `بازگشت مرجوعی فاکتور #${saleId}`)
+    }
+
+    postReturnJournal(returnId, new Date().toISOString().slice(0, 10), refundAmount, cogsAmount, saleRow?.paymentMethod)
   }
   return db.prepare('SELECT r.*, s.invoiceNumber as saleInvoiceNumber, p.title as productTitle, u.name as userName FROM returns r LEFT JOIN sales s ON r.saleId = s.id LEFT JOIN products p ON r.productId = p.id LEFT JOIN users u ON r.userId = u.id WHERE r.id = ?').get(returnId) as Return
 }

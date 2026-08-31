@@ -1,6 +1,11 @@
 /**
  * Employees — employee management and payroll processing.
- * Features: list, add, salary, payroll processing, payslip view.
+ *
+ * Features:
+ *   - Employee list with search, salary display
+ *   - Employee detail: personal info, salary info, payment history
+ *   - Process payroll with bonuses, deductions, overtime
+ *   - Payroll history per employee with net salary calculation
  */
 import { useState, useEffect } from 'react'
 import { useTheme } from '../hooks/useTheme'
