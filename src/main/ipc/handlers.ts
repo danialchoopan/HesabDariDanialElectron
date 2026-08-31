@@ -795,6 +795,14 @@ export function registerAllHandlers(): void {
   })
 
   handle('accounting:seedDemo', () => seedRepo.seedDemoData())
+  handle('seed:demo', () => {
+    try {
+      const seeded = seedRepo.seedDemoData()
+      return { success: true, data: { seeded, message: seeded ? 'داده‌های آزمایشی بارگذاری شد' : 'داده‌ها از قبل موجود است' } }
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
   handle('suppliers:getAll', () => suppliersRepo.getAllSuppliers())
   ipcMain.handle('suppliers:getById', (_e, a: { id: number }) => ({ success: true, data: suppliersRepo.getSupplierById(a.id) }))
   ipcMain.handle('suppliers:search', (_e, a: { query: string }) => ({ success: true, data: suppliersRepo.searchSuppliers(a.query) }))

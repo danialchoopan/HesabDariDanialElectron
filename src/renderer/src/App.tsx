@@ -179,7 +179,13 @@ export default function App() {
   const clearNavParams = useCallback(() => setNavParams(null), [])
 
   if (isFirstRun === null) return <div className="h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-secondary)' }}>Loading...</div>
-  if (isFirstRun) return <SetupWizard onComplete={() => setIsFirstRun(false)} />
+  if (isFirstRun) return <SetupWizard onComplete={() => {
+    setIsFirstRun(false)
+    // Auto-load demo data after first-time setup so the app is ready to
+    // explore. Remove this block for production if you don't want demo data
+    // seeded for every new installation.
+    window.api.system.seedDemo().then(r => { if (r.success && r.data?.seeded) window.location.reload() })
+  }} />
   if (!user) return <LockScreen />
 
   return (

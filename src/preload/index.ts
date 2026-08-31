@@ -49,6 +49,8 @@ const api = {
       ipcRenderer.invoke('system:checkUpdate'),
     getVersion: (): Promise<IPCResponse<string>> =>
       ipcRenderer.invoke('system:getVersion'),
+    seedDemo: (): Promise<IPCResponse<{ seeded: boolean; message: string }>> =>
+      ipcRenderer.invoke('seed:demo'),
   },
 
   auth: {

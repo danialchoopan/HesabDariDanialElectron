@@ -132,6 +132,22 @@ export default function BackupSection() {
         )}
       </div>
 
+      {/* ─── Demo data ───────────────────────── */}
+      <div className="pt-3" style={{ borderTop: `1px solid ${cBorder}` }}>
+        <button onClick={async () => {
+          setLoading(true)
+          const r = await window.api.system.seedDemo()
+          setLoading(false)
+          if (r.success && r.data?.seeded) { alert('داده‌های آزمایشی بارگذاری شد. برنامه مجدداً بارگذاری می‌شود.'); window.location.reload() }
+          else alert(r.data?.message || r.error || 'خطا در بارگذاری داده‌های آزمایشی')
+        }} disabled={loading}
+          className="w-full px-4 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2"
+          style={{ backgroundColor: 'rgba(34,197,94,0.1)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)' }}>
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/><circle cx="12" cy="12" r="4"/></svg>
+          {loading ? 'در حال بارگذاری...' : 'بارگذاری داده‌های آزمایشی'}
+        </button>
+      </div>
+
       {/* ─── Delete Database ───────────────────── */}
       <div className="pt-3" style={{ borderTop: `1px solid ${cBorder}` }}>
         <button onClick={() => setShowResetStep1(true)}
