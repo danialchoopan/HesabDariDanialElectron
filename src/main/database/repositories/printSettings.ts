@@ -27,6 +27,7 @@ export const DEFAULT_PRINT_SETTINGS: Record<string, string> = {
   printHeaderField3: '',
   printBorderStyle: 'none',
   printHeaderAlign: 'center',
+  printFontFamily: 'Vazirmatn',
   printActiveTemplate: 'default',
 }
 

@@ -12,6 +12,8 @@ const BUILT_IN: TemplateInfo[] = [
   { key: 'modern', name: 'مدرن', color: '#2563eb', border: 'simple', align: 'center' },
   { key: 'minimal', name: 'مینیمال', color: '#64748b', border: 'none', align: 'right' },
   { key: 'elegant', name: 'شیک', color: '#7c3aed', border: 'decorative', align: 'center' },
+  { key: 'corporate', name: 'شرکتی', color: '#0f766e', border: 'simple', align: 'center' },
+  { key: 'warm', name: 'گرم', color: '#b45309', border: 'decorative', align: 'center' },
 ]
 
 export default function PrintPreviewDialog() {
@@ -184,7 +186,9 @@ export default function PrintPreviewDialog() {
 
           {/* Preview Area */}
           <div className="flex-1 p-4 overflow-y-auto flex items-start justify-center" style={{ backgroundColor: isDark ? '#0a0f1a' : '#f0f4f8' }}>
-            <div className="w-full max-w-lg shadow-xl rounded-lg overflow-hidden" style={{ transform: 'scale(0.7)', transformOrigin: 'top center' }}>
+            {/* White "paper" so the preview always reads like the real print,
+                regardless of the app theme (dark mode must not white-out text). */}
+            <div className="w-full max-w-lg shadow-xl rounded-lg overflow-hidden" style={{ transform: 'scale(0.7)', transformOrigin: 'top center', backgroundColor: '#fff', color: '#1a1a1a' }}>
               <div dangerouslySetInnerHTML={{ __html: getPreviewHTML() }} />
             </div>
           </div>

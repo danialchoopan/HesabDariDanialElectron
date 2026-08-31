@@ -43,6 +43,7 @@ interface PrintSettings {
   printHeaderField3: string
   printBorderStyle: string
   printHeaderAlign: string
+  printFontFamily: string
   printActiveTemplate: string
 }
 
@@ -53,7 +54,7 @@ const defaults: PrintSettings = {
   printFontSize: '11pt', printHeaderSize: '18pt', printLineSpacing: '1.5',
   printMarginTop: '15', printMarginBottom: '15', printMarginLeft: '15', printMarginRight: '15',
   printPaperSize: 'A4', printHeaderField1: '', printHeaderField2: '', printHeaderField3: '',
-  printBorderStyle: 'none', printHeaderAlign: 'center', printActiveTemplate: 'default',
+  printBorderStyle: 'none', printHeaderAlign: 'center', printFontFamily: 'Vazirmatn', printActiveTemplate: 'default',
 }
 
 const BUILT_IN_TEMPLATES = [
@@ -62,6 +63,8 @@ const BUILT_IN_TEMPLATES = [
   { key: 'modern', name: 'مدرن', color: '#2563eb', border: 'simple', align: 'center' },
   { key: 'minimal', name: 'مینیمال', color: '#64748b', border: 'none', align: 'right' },
   { key: 'elegant', name: 'شیک', color: '#7c3aed', border: 'decorative', align: 'center' },
+  { key: 'corporate', name: 'شرکتی', color: '#0f766e', border: 'simple', align: 'center' },
+  { key: 'warm', name: 'گرم', color: '#b45309', border: 'decorative', align: 'center' },
 ]
 
 export default function CustomizationSettings() {
@@ -337,6 +340,8 @@ export default function CustomizationSettings() {
               </div>
               <Select label="سایز کاغذ" value={settings.printPaperSize} onChange={v => update('printPaperSize', v)}
                 options={[{ value: 'A4', label: 'A4' }, { value: 'A5', label: 'A5' }, { value: 'Letter', label: 'Letter' }]} />
+              <Select label="فونت چاپ" value={settings.printFontFamily} onChange={v => update('printFontFamily', v)}
+                options={[{ value: 'Vazirmatn', label: 'وزیرمتن' }, { value: 'Tahoma', label: 'تاهوما' }, { value: 'Arial', label: 'آریال' }, { value: 'Courier New', label: 'کوریر (تک‌فاصله)' }]} />
               <Select label="اندازه قلم" value={settings.printFontSize} onChange={v => update('printFontSize', v)}
                 options={[{ value: '9pt', label: '۹' }, { value: '10pt', label: '۱۰' }, { value: '11pt', label: '۱۱' }, { value: '12pt', label: '۱۲' }, { value: '14pt', label: '۱۴' }]} />
               <Select label="اندازه عنوان" value={settings.printHeaderSize} onChange={v => update('printHeaderSize', v)}
@@ -401,8 +406,11 @@ export default function CustomizationSettings() {
         <div className="lg:col-span-2 space-y-3">
           <Card className="sticky top-4">
             <Label>پیش‌نمایش</Label>
-            <div className="rounded-lg overflow-hidden mt-2 border" style={{ borderColor: cardBorder, backgroundColor: '#fff', transform: 'scale(0.65)', transformOrigin: 'top center' }}>
-              <div className="p-4 text-center" style={{ borderTop: settings.printBorderStyle === 'simple' ? `3px solid ${primary}` : settings.printBorderStyle === 'double' ? `6px double ${primary}` : settings.printBorderStyle === 'decorative' ? `8px solid ${primary}` : 'none' }}>
+            {/* The preview simulates a real print on WHITE paper, so it must
+                force dark text regardless of the app theme (otherwise text
+                inherits the theme color and becomes unreadable in dark mode). */}
+            <div className="rounded-lg overflow-hidden mt-2 border" style={{ borderColor: cardBorder, backgroundColor: '#fff', color: '#1a1a1a', transform: 'scale(0.65)', transformOrigin: 'top center' }}>
+              <div className="p-4 text-center" style={{ color: '#1a1a1a', borderTop: settings.printBorderStyle === 'simple' ? `3px solid ${primary}` : settings.printBorderStyle === 'double' ? `6px double ${primary}` : settings.printBorderStyle === 'decorative' ? `8px solid ${primary}` : 'none' }}>
                 {previews.logo && <img src={previews.logo} className="max-h-8 mx-auto mb-1" alt="" />}
                 {settings.printHeaderField1 && <div className="text-[7px] text-gray-400 border-b border-dashed pb-0.5 mb-0.5">{settings.printHeaderField1}</div>}
                 {settings.printHeaderField2 && <div className="text-[7px] text-gray-400 border-b border-dashed pb-0.5 mb-0.5">{settings.printHeaderField2}</div>}
