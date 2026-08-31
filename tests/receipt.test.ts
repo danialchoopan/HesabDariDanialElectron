@@ -59,4 +59,23 @@ describe('generateReceiptHTML', () => {
     expect(html).toContain('dir="rtl"')
     expect(html).toContain('width:80mm')
   })
+
+  it('supports 58mm thermal width', () => {
+    const html = generateReceiptHTML(baseData({ width: '58mm' }))
+    expect(html).toContain('width:58mm')
+  })
+
+  it('hides change/customer rows when disabled', () => {
+    const html = generateReceiptHTML(baseData({ customer: 'علی', customerPaid: 2000, change: 500, showChange: false, showCustomer: false }))
+    expect(html).not.toContain('پول خرد')
+    expect(html).not.toContain('مشتری')
+    expect(html).not.toContain('پرداختی مشتری')
+    expect(html).toContain('مبلغ قابل پرداخت')
+  })
+
+  it('renders header extra and logo when provided', () => {
+    const html = generateReceiptHTML(baseData({ headerExtra: 'رسید آزمایشی', logo: 'data:image/png;base64,xxx' }))
+    expect(html).toContain('رسید آزمایشی')
+    expect(html).toContain('<img src="data:image/png;base64,xxx"')
+  })
 })

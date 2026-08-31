@@ -105,7 +105,7 @@ export default function PrintPreviewDialog() {
     }
 
     const printName = templateShopNames[activeTemplate] || shopName
-    await printA4Report(pending.html, pending.title, { isInvoice: pending.isInvoice, shopName: printName, customization: custom })
+    await printA4Report(pending.html, pending.title, { isInvoice: pending.isInvoice, shopName: printName, customization: custom, qrData: pending.qrData })
     setLoading(false)
     pending.onClose?.()
     clear()

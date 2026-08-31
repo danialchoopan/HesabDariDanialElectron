@@ -296,7 +296,7 @@ export default function SalesTerminal() {
             html += '</tbody></table>'
             html += `<p><strong>جمع کل: ${saleComplete.total_amount.toLocaleString('fa-IR')} تومان</strong></p>`
             if (saleNote) html += `<div style="margin-top:8px;padding:6px 8px;font-size:9pt;color:#666;border-top:1px dashed #ccc">${saleNote}</div>`
-            showPrint(html, 'فاکتور فروش', true)
+            showPrint(html, 'فاکتور فروش', true, saleComplete.invoiceNumber)
             setSaleComplete(null)
           }}>چاپ A4</DialogButton>
         </>}>

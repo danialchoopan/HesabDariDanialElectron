@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import type { Sale } from '../../../../types'
 import { fa } from '../../i18n'
 import { formatJalaliDateTime } from '../../utils/jalali'
@@ -15,40 +16,30 @@ interface Props {
 
 export default function ReceiptPrinter({ sale, storeName, storeAddress, storePhone, receiptFooter, onClose }: Props) {
   const { isDark } = useTheme()
+  const [ps, setPs] = useState<Record<string, string>>({})
+  const [logo, setLogo] = useState('')
   const methodLabel = sale.paymentMethod === 'cash' ? fa.payment.cash : sale.paymentMethod === 'card' ? fa.payment.card : fa.payment.ledger
 
-  const handlePrint = () => {
-    const html = generateReceiptHTML({
-      title: fa.receipt.invoice,
-      invoiceNumber: sale.invoiceNumber,
-      date: formatJalaliDateTime(sale.createdAt),
-      cashier: sale.userName,
-      customer: sale.customerName,
-      method: methodLabel,
-      items: (sale.items || []).map((item: any) => ({
-        name: item.productTitle,
-        qty: item.quantity,
-        price: item.unitPrice,
-        total: item.subtotal,
-      })),
-      subtotal: sale.subtotal,
-      total: sale.total_amount,
-      shipping: sale.shippingCost,
-      customerPaid: sale.paymentMethod === 'cash' ? sale.customerPaid : undefined,
-      change: sale.paymentMethod === 'cash' ? sale.changeAmount : undefined,
-      footer: receiptFooter || fa.receipt.thankYou,
-      storeName,
-      storeAddress,
-      storePhone,
-    })
-    printContent(html)
-  }
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const r = await window.api.printSettings.getAll()
+      if (!r.success || !r.data || cancelled) return
+      setPs(r.data)
+      if (r.data.printReceiptShowLogo === 'true' && r.data.printLogo) {
+        const ar = await window.api.printSettings.getAsset(r.data.printLogo)
+        if (!cancelled && ar.success && ar.data) setLogo(ar.data as string)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
 
-  const previewHTML = generateReceiptHTML({
+  const base: any = {
     title: fa.receipt.invoice,
     invoiceNumber: sale.invoiceNumber,
     date: formatJalaliDateTime(sale.createdAt),
     cashier: sale.userName,
+    customer: sale.customerName,
     method: methodLabel,
     items: (sale.items || []).map((item: any) => ({
       name: item.productTitle,
@@ -62,8 +53,21 @@ export default function ReceiptPrinter({ sale, storeName, storeAddress, storePho
     customerPaid: sale.paymentMethod === 'cash' ? sale.customerPaid : undefined,
     change: sale.paymentMethod === 'cash' ? sale.changeAmount : undefined,
     footer: receiptFooter || fa.receipt.thankYou,
-    storeName, storeAddress, storePhone,
-  })
+    storeName,
+    storeAddress,
+    storePhone,
+    width: ps.printReceiptWidth || '80mm',
+    showCustomer: ps.printReceiptShowCustomer !== 'false',
+    showChange: ps.printReceiptShowChange !== 'false',
+    headerExtra: ps.printReceiptHeaderExtra || '',
+    logo,
+  }
+
+  const handlePrint = () => {
+    printContent(generateReceiptHTML(base))
+  }
+
+  const previewHTML = generateReceiptHTML(base)
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center no-print">

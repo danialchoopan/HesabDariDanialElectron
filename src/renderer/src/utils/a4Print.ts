@@ -11,6 +11,7 @@
  */
 
 import { formatDateTimeNow } from './jalali'
+import { generateQRDataURL } from './qrCode'
 
 let cachedShopName = ''
 let cachedShopPhone = ''
@@ -49,6 +50,7 @@ export async function printA4Report(html: string, title: string, options?: {
   isInvoice?: boolean
   taxRate?: number
   customization?: Record<string, string>
+  qrData?: string
 }): Promise<void> {
   const cust = { ...cachedCustomization, ...(options?.customization || {}) }
 
@@ -122,6 +124,20 @@ export async function printA4Report(html: string, title: string, options?: {
   if (cust.printBorderStyle === 'double') borderCSS = `body { border-top: 6px double ${primaryColor}; border-bottom: 6px double ${primaryColor}; padding: 10px 0; }`
   if (cust.printBorderStyle === 'decorative') borderCSS = `body { border-top: 8px solid ${primaryColor}; border-bottom: 4px solid ${primaryColor}; padding: 10px 0; }`
 
+  // Table style: 'bordered' (default) or 'clean' (no cell borders)
+  const tableCSS = cust.printTableStyle === 'clean'
+    ? `table { width: 100%; border-collapse: collapse; margin-bottom: 12px; } th { padding: 8px 6px; text-align: right; font-size: 10pt; } td { padding: 6px; text-align: right; font-size: 10pt; }`
+    : `table { width: 100%; border-collapse: collapse; margin-bottom: 12px; } th { background: #f0f4f8; padding: 8px 6px; text-align: right; font-size: 10pt; border-bottom: 2px solid #333; } td { padding: 6px; text-align: right; font-size: 10pt; border-bottom: 1px solid #ddd; }`
+
+  // Optional QR code on the invoice (e.g. encodes the invoice number)
+  let qrHtml = ''
+  if (cust.printShowInvoiceQr === 'true' && options?.qrData) {
+    try {
+      const qrDataUrl = await generateQRDataURL(options.qrData, 160)
+      qrHtml = `<div style="text-align:center; margin-top:14px;"><img src="${qrDataUrl}" style="width:80px; height:80px;" alt="QR"/><div style="font-size:7pt; color:#999; margin-top:2px;">${options.qrData}</div></div>`
+    } catch { /* keep no QR if generation fails */ }
+  }
+
   win.document.write(`<!DOCTYPE html>
 <html dir="rtl" lang="fa">
 <head>
@@ -138,9 +154,7 @@ export async function printA4Report(html: string, title: string, options?: {
     .shop-phone { text-align: center; font-size: 11pt; color: #555; margin-bottom: 6px; }
     .report-title { text-align: ${cust.printHeaderAlign || 'center'}; font-size: 12pt; font-weight: 600; color: #333; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid ${primaryColor}; }
     h2 { font-size: 12pt; margin-bottom: 6px; color: #333; margin-top: 16px; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
-    th { background: #f0f4f8; padding: 8px 6px; text-align: right; font-size: 10pt; border-bottom: 2px solid #333; }
-    td { padding: 6px; text-align: right; font-size: 10pt; border-bottom: 1px solid #ddd; }
+    ${tableCSS}
     .total-row { font-weight: bold; background: #e8f0fe; }
     .footer { text-align: center; margin-top: 20px; font-size: 9pt; color: #666; border-top: 1px solid #ccc; padding-top: 8px; }
     .header-info { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 10pt; color: #555; }
@@ -166,6 +180,7 @@ export async function printA4Report(html: string, title: string, options?: {
   ${taxInfo}
   ${html}
   ${invoiceSection}
+  ${qrHtml}
   <div class="footer">${footerText}</div>
 </body>
 </html>`)

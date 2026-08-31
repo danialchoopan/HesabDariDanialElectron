@@ -16,6 +16,12 @@ export interface ReceiptData {
   storeAddress?: string
   storePhone?: string
   extra?: { label: string; value: string; color?: string }[]
+  // thermal customization (from print settings)
+  width?: string          // '58mm' | '80mm'
+  showCustomer?: boolean
+  showChange?: boolean
+  headerExtra?: string
+  logo?: string           // data URI
 }
 
 export function generateReceiptHTML(data: ReceiptData): string {
@@ -33,11 +39,18 @@ export function generateReceiptHTML(data: ReceiptData): string {
       <span style="${e.color ? `color:${e.color};font-weight:bold` : ''}">${e.value}</span>
     </div>`).join('')
 
+  const showCustomer = data.showCustomer !== false
+  const showChange = data.showChange !== false
+  const width = data.width || '80mm'
+  const logoHtml = data.logo
+    ? `<img src="${data.logo}" style="max-height:50px;max-width:150px;display:block;margin:0 auto 4px auto;" />`
+    : ''
+
   return `<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8">
 <title>${data.title} ${data.invoiceNumber || ''}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Courier New',monospace;font-size:11px;direction:rtl;padding:5mm;width:80mm;color:#000;background:#fff}
+body{font-family:'Courier New',monospace;font-size:11px;direction:rtl;padding:5mm;width:${width};color:#000;background:#fff}
 .receipt{padding:3mm}
 .header{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:6px}
 .store-name{font-size:16px;font-weight:bold;letter-spacing:1px}
@@ -58,16 +71,18 @@ td{font-size:10px}
 </style></head><body>
 <div class="receipt">
   <div class="header">
+    ${logoHtml}
     <div class="store-name">${data.storeName}</div>
     ${data.storeAddress ? `<div class="store-info">${data.storeAddress}</div>` : ''}
     ${data.storePhone ? `<div class="store-info">${data.storePhone}</div>` : ''}
+    ${data.headerExtra ? `<div class="store-info" style="font-size:10px;color:#000">${data.headerExtra}</div>` : ''}
   </div>
 
   <div class="title">${data.title}</div>
   ${data.invoiceNumber ? `<div class="info"><span>شماره: ${data.invoiceNumber}</span></div>` : ''}
   <div class="info"><span>تاریخ: ${data.date}</span></div>
   ${data.cashier ? `<div class="info"><span>صندوق‌دار: ${data.cashier}</span></div>` : ''}
-  ${data.customer ? `<div class="info"><span>مشتری: ${data.customer}</span></div>` : ''}
+  ${data.customer && showCustomer ? `<div class="info"><span>مشتری: ${data.customer}</span></div>` : ''}
   ${data.method ? `<div class="info"><span>نحوه پرداخت: ${data.method}</span></div>` : ''}
 
   <table>
@@ -86,8 +101,10 @@ td{font-size:10px}
     <div class="total-row"><span>جمع کل</span><span>${data.subtotal.toLocaleString('fa-IR')} تومان</span></div>
     ${data.shipping ? `<div class="total-row"><span>هزینه ارسال</span><span>${data.shipping.toLocaleString('fa-IR')} تومان</span></div>` : ''}
     ${extraRows}
-    ${data.customerPaid ? `<div class="total-row"><span>پرداختی مشتری</span><span>${data.customerPaid.toLocaleString('fa-IR')} تومان</span></div>` : ''}
-    ${data.change !== undefined ? `<div class="total-row"><span>پول خرد</span><span>${data.change.toLocaleString('fa-IR')} تومان</span></div>` : ''}
+    ${showChange ? `
+      ${data.customerPaid ? `<div class="total-row"><span>پرداختی مشتری</span><span>${data.customerPaid.toLocaleString('fa-IR')} تومان</span></div>` : ''}
+      ${data.change !== undefined ? `<div class="total-row"><span>پول خرد</span><span>${data.change.toLocaleString('fa-IR')} تومان</span></div>` : ''}
+    ` : ''}
     <div class="total-row grand"><span>مبلغ قابل پرداخت</span><span>${data.total.toLocaleString('fa-IR')} تومان</span></div>
   </div>
 

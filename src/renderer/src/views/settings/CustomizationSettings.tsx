@@ -44,6 +44,13 @@ interface PrintSettings {
   printBorderStyle: string
   printHeaderAlign: string
   printFontFamily: string
+  printTableStyle: string
+  printShowInvoiceQr: string
+  printReceiptWidth: string
+  printReceiptShowChange: string
+  printReceiptShowCustomer: string
+  printReceiptHeaderExtra: string
+  printReceiptShowLogo: string
   printActiveTemplate: string
 }
 
@@ -54,7 +61,11 @@ const defaults: PrintSettings = {
   printFontSize: '11pt', printHeaderSize: '18pt', printLineSpacing: '1.5',
   printMarginTop: '15', printMarginBottom: '15', printMarginLeft: '15', printMarginRight: '15',
   printPaperSize: 'A4', printHeaderField1: '', printHeaderField2: '', printHeaderField3: '',
-  printBorderStyle: 'none', printHeaderAlign: 'center', printFontFamily: 'Vazirmatn', printActiveTemplate: 'default',
+  printBorderStyle: 'none', printHeaderAlign: 'center', printFontFamily: 'Vazirmatn',
+  printTableStyle: 'bordered', printShowInvoiceQr: 'false',
+  printReceiptWidth: '80mm', printReceiptShowChange: 'true', printReceiptShowCustomer: 'true',
+  printReceiptHeaderExtra: '', printReceiptShowLogo: 'false',
+  printActiveTemplate: 'default',
 }
 
 const BUILT_IN_TEMPLATES = [
@@ -399,6 +410,37 @@ export default function CustomizationSettings() {
           <Card>
             <Toggle label="نمایش امضا در فاکتور" value={settings.printShowSignature === 'true'} onChange={v => update('printShowSignature', String(v))} />
             <Toggle label="نمایش مالیات" value={settings.printShowTax === 'true'} onChange={v => update('printShowTax', String(v))} />
+          </Card>
+
+          {/* A4 extras */}
+          <Card>
+            <Select label="سبک جدول A4" value={settings.printTableStyle} onChange={v => update('printTableStyle', v)}
+              options={[{ value: 'bordered', label: 'جدول‌دار' }, { value: 'clean', label: 'ساده (بدون خط)' }]} />
+            <div className="pt-2">
+              <Toggle label="درج QR کد فاکتور در انتهای سند" value={settings.printShowInvoiceQr === 'true'} onChange={v => update('printShowInvoiceQr', String(v))} />
+            </div>
+          </Card>
+
+          {/* Thermal receipt settings */}
+          <Card>
+            <div className="flex items-center gap-2 mb-3">
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke={primary} strokeWidth="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+              <span className="text-sm font-extrabold" style={{ color: textPrimary }}>پرینت حرارتی (رسید)</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Select label="عرض کاغذ" value={settings.printReceiptWidth} onChange={v => update('printReceiptWidth', v)}
+                options={[{ value: '80mm', label: '۸۰ میلی‌متر' }, { value: '58mm', label: '۵۸ میلی‌متر' }]} />
+              <div className="flex items-end pb-1">
+                <Toggle label="نمایش لوگو" value={settings.printReceiptShowLogo === 'true'} onChange={v => update('printReceiptShowLogo', String(v))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mt-1">
+              <Toggle label="نمایش مشتری" value={settings.printReceiptShowCustomer === 'true'} onChange={v => update('printReceiptShowCustomer', String(v))} />
+              <Toggle label="نمایش پول خرد" value={settings.printReceiptShowChange === 'true'} onChange={v => update('printReceiptShowChange', String(v))} />
+            </div>
+            <div className="mt-3">
+              <Input label="متن اضافه در سربرگ رسید" value={settings.printReceiptHeaderExtra} onChange={v => update('printReceiptHeaderExtra', v)} placeholder="مثلاً: این رسید فقط برای خرید حضوری معتبر است" />
+            </div>
           </Card>
         </div>
 

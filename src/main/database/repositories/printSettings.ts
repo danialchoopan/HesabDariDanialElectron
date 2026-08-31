@@ -28,6 +28,14 @@ export const DEFAULT_PRINT_SETTINGS: Record<string, string> = {
   printBorderStyle: 'none',
   printHeaderAlign: 'center',
   printFontFamily: 'Vazirmatn',
+  // A4 invoice extras
+  printTableStyle: 'bordered',          // 'bordered' | 'clean'
+  printShowInvoiceQr: 'false',          // embed a QR code on the invoice
+  // Thermal receipt extras
+  printReceiptWidth: '80mm',            // '58mm' | '80mm'
+  printReceiptShowChange: 'true',
+  printReceiptShowCustomer: 'true',
+  printReceiptHeaderExtra: '',
   printActiveTemplate: 'default',
 }
 
