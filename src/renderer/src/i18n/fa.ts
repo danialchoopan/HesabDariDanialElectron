@@ -87,7 +87,7 @@ export const fa = {
     ledger: 'بدهی',
     expenses: 'هزینه‌ها',
     profit: 'سود خالص',
-    cashierPerformance: 'عملکرد صندوک‌دار',
+    cashierPerformance: 'عملکرد صندوق‌دار',
     topProducts: 'پرفروش‌ترین کالاها',
     recentSales: 'تاریخچه فروش',
     dateFrom: 'از تاریخ',

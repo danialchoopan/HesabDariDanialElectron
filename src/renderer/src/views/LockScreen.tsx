@@ -132,7 +132,7 @@ function AccountList({
                 className="text-[14px] leading-[20px] font-medium block"
                 style={{
                   color: isDark ? '#fdfcff' : colors.onSurface,
-                  fontFamily: "'IBM Plex Sans', sans-serif",
+                  fontFamily: "'Vazirmatn', sans-serif",
                 }}
               >
                 {u.name}
@@ -233,7 +233,7 @@ function UnifiedLayout({ users, selectedUser, error, loading, pin, password, sho
         <section className="hidden lg:flex col-span-5 flex-col items-start text-right pr-12">
           <div className="mb-6">
             <LogoIcon size={96} />
-            <h1 className="text-[32px] leading-[48px] font-bold mt-4 mb-1" style={{ color: titleColor, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+            <h1 className="text-[32px] leading-[48px] font-bold mt-4 mb-1" style={{ color: titleColor, fontFamily: "'Vazirmatn', sans-serif" }}>
               {ui.app.title}
             </h1>
             <p className="text-[18px] leading-[28px]" style={{ color: subtitleColor }}>
@@ -250,7 +250,7 @@ function UnifiedLayout({ users, selectedUser, error, loading, pin, password, sho
       </svg>
     </div>
     <div>
-      <h3 className="text-[14px] leading-[20px] font-medium" style={{ color: featureTextPrimary, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+      <h3 className="text-[14px] leading-[20px] font-medium" style={{ color: featureTextPrimary, fontFamily: "'Vazirmatn', sans-serif" }}>
         انبارداری پیشرفته
       </h3>
       <p className="text-[12px]" style={{ color: featureTextSecondary }}>
@@ -268,7 +268,7 @@ function UnifiedLayout({ users, selectedUser, error, loading, pin, password, sho
       </svg>
     </div>
     <div>
-      <h3 className="text-[14px] leading-[20px] font-medium" style={{ color: featureTextPrimary, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+      <h3 className="text-[14px] leading-[20px] font-medium" style={{ color: featureTextPrimary, fontFamily: "'Vazirmatn', sans-serif" }}>
         فروش و حسابداری پیشرفته
       </h3>
       <p className="text-[12px]" style={{ color: featureTextSecondary }}>
@@ -287,7 +287,7 @@ function UnifiedLayout({ users, selectedUser, error, loading, pin, password, sho
       </svg>
     </div>
     <div>
-      <h3 className="text-[14px] leading-[20px] font-medium" style={{ color: featureTextPrimary, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+      <h3 className="text-[14px] leading-[20px] font-medium" style={{ color: featureTextPrimary, fontFamily: "'Vazirmatn', sans-serif" }}>
         مدیریت بدهی مشتریان
       </h3>
       <p className="text-[12px]" style={{ color: featureTextSecondary }}>
@@ -302,7 +302,7 @@ function UnifiedLayout({ users, selectedUser, error, loading, pin, password, sho
           <div className="w-full max-w-[520px] rounded-xl p-8 shadow-2xl" style={{ background: loginCardBg, backdropFilter: brandCardBlur, border: loginCardBorder }}>
             <div className="flex justify-between items-center mb-8">
               <div>
-                <h2 className="text-[24px] leading-[36px] font-semibold" style={{ color: titleColor, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+                <h2 className="text-[24px] leading-[36px] font-semibold" style={{ color: titleColor, fontFamily: "'Vazirmatn', sans-serif" }}>
                   خوش آمدید
                 </h2>
                 <p className="text-[16px] leading-[24px]" style={{ color: subtitleColor }}>
@@ -323,7 +323,7 @@ function UnifiedLayout({ users, selectedUser, error, loading, pin, password, sho
                 {/* 'none' mode: simple login button, no credential input needed */}
                 {loginMethod !== 'none' ? (<>
                 <div className="space-y-2">
-                  <label className="text-[14px] leading-[20px] font-medium block pr-1" style={{ color: labelColor, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+                  <label className="text-[14px] leading-[20px] font-medium block pr-1" style={{ color: labelColor, fontFamily: "'Vazirmatn', sans-serif" }}>
                     {loginMethod === 'password' ? 'رمز عبور' : 'رمز ۴ رقمی (PIN)'}
                   </label>
                   {/* Password mode: single text input. PIN mode: 4 individual digit boxes below */}
@@ -396,7 +396,7 @@ function UnifiedLayout({ users, selectedUser, error, loading, pin, password, sho
                   style={{
                     background: loading || (loginMethod === 'pin' ? pin.length < 4 : !password) ? colors.primaryContainer : colors.primary,
                     color: colors.onPrimary,
-                    fontFamily: "'IBM Plex Sans', sans-serif",
+                    fontFamily: "'Vazirmatn', sans-serif",
                     boxShadow: '0 4px 16px rgba(0, 97, 148, 0.2)',
                     opacity: loading || (loginMethod === 'pin' ? pin.length < 4 : !password) ? 0.7 : 1,
                     cursor: loading || (loginMethod === 'pin' ? pin.length < 4 : !password) ? 'not-allowed' : 'pointer',
@@ -433,7 +433,7 @@ function UnifiedLayout({ users, selectedUser, error, loading, pin, password, sho
       </main>
 
       <footer className="absolute bottom-0 w-full py-3 px-8 flex justify-between items-center" style={{ background: footerBg, backdropFilter: isDark ? 'blur(12px)' : undefined, borderTop: footerBorder }}>
-        <p className="text-[14px] leading-[20px] font-medium opacity-60" style={{ color: footerText, fontFamily: "'IBM Plex Sans', sans-serif" }}>© تمامی حقوق برای {ui.app.title} محفوظ است</p>
+        <p className="text-[14px] leading-[20px] font-medium opacity-60" style={{ color: footerText, fontFamily: "'Vazirmatn', sans-serif" }}>© تمامی حقوق برای {ui.app.title} محفوظ است</p>
         <div className="flex gap-6">
           <a className="text-[14px] leading-[20px] font-medium hover:underline transition-colors" style={{ color: footerText }} href="#" onClick={(e) => e.preventDefault()}>تماس با پشتیبانی</a>
         </div>

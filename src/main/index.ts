@@ -76,6 +76,20 @@ function registerNavigationShortcuts(): void {
   }
 }
 
+// Compares two semver-like strings "a.b.c". Returns:
+//  1 if v1 > v2, -1 if v1 < v2, 0 if equal
+function compareVersions(v1: string, v2: string) {
+  const p1 = v1.split('.').map(Number)
+  const p2 = v2.split('.').map(Number)
+  for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
+    const a = p1[i] || 0
+    const b = p2[i] || 0
+    if (a > b) return 1
+    if (a < b) return -1
+  }
+  return 0
+}
+
 app.whenReady().then(async () => {
   try {
     getDatabase()
