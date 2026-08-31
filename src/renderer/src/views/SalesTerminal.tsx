@@ -280,7 +280,7 @@ export default function SalesTerminal() {
         icon={<svg className="w-8 h-8 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>}
         footer={<>
           <DialogButton variant="ghost" onClick={() => setSaleComplete(null)}>{fa.common.close}</DialogButton>
-          <DialogButton variant="primary" onClick={() => { if (saleComplete) { setShowReceipt(saleComplete); setSaleComplete(null) } }}>{fa.receipt.print}</DialogButton>
+          <DialogButton variant="primary" onClick={() => { if (saleComplete) { setShowReceipt(saleComplete); setSaleComplete(null) } }}>{fa.receipt.thermalPrint}</DialogButton>
           <DialogButton variant="success" onClick={async () => {
             if (!saleComplete) return
             const customerName = saleComplete.customerName || lastCustomer?.name || ''

@@ -1,6 +1,6 @@
 {
   "name": "hesabdari-danial",
-  "version": "1.12.0",
+  "version": "1.13.0",
   "description": "حسابداری دانیال — نرم‌افزار جامع حسابداری، انبارداری و فروش برای کسب‌وکارهای مدرن",
   "main": "dist-electron/main/index.js",
   "scripts": {

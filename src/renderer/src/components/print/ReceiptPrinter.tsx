@@ -33,6 +33,7 @@ export default function ReceiptPrinter({ sale, storeName, storeAddress, storePho
       })),
       subtotal: sale.subtotal,
       total: sale.total_amount,
+      shipping: sale.shippingCost,
       customerPaid: sale.paymentMethod === 'cash' ? sale.customerPaid : undefined,
       change: sale.paymentMethod === 'cash' ? sale.changeAmount : undefined,
       footer: receiptFooter || fa.receipt.thankYou,
@@ -57,6 +58,7 @@ export default function ReceiptPrinter({ sale, storeName, storeAddress, storePho
     })),
     subtotal: sale.subtotal,
     total: sale.total_amount,
+    shipping: sale.shippingCost,
     customerPaid: sale.paymentMethod === 'cash' ? sale.customerPaid : undefined,
     change: sale.paymentMethod === 'cash' ? sale.changeAmount : undefined,
     footer: receiptFooter || fa.receipt.thankYou,
@@ -90,7 +92,7 @@ export default function ReceiptPrinter({ sale, storeName, storeAddress, storePho
         <div className="flex gap-2">
           <button onClick={handlePrint} className="btn-primary flex-1 py-3 flex items-center justify-center gap-2">
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-            {fa.receipt.print}
+            {fa.receipt.thermalPrint}
           </button>
           <button onClick={onClose} className="btn-success flex-1 py-3">{fa.common.close}</button>
         </div>

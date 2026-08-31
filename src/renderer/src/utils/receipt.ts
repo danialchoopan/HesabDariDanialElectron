@@ -8,6 +8,7 @@ export interface ReceiptData {
   items: { name: string; qty: number; price: number; total: number }[]
   subtotal: number
   total: number
+  shipping?: number
   customerPaid?: number
   change?: number
   footer?: string
@@ -83,7 +84,7 @@ td{font-size:10px}
 
   <div class="total-section">
     <div class="total-row"><span>جمع کل</span><span>${data.subtotal.toLocaleString('fa-IR')} تومان</span></div>
-    ${data.subtotal !== data.total ? `<div class="total-row"><span>گرد شده</span><span>${data.total.toLocaleString('fa-IR')} تومان</span></div>` : ''}
+    ${data.shipping ? `<div class="total-row"><span>هزینه ارسال</span><span>${data.shipping.toLocaleString('fa-IR')} تومان</span></div>` : ''}
     ${extraRows}
     ${data.customerPaid ? `<div class="total-row"><span>پرداختی مشتری</span><span>${data.customerPaid.toLocaleString('fa-IR')} تومان</span></div>` : ''}
     ${data.change !== undefined ? `<div class="total-row"><span>پول خرد</span><span>${data.change.toLocaleString('fa-IR')} تومان</span></div>` : ''}

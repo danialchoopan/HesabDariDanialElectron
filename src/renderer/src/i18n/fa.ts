@@ -208,6 +208,7 @@ export const fa = {
   },
   receipt: {
     print: 'چاپ فاکتور',
+    thermalPrint: 'پرینت حرارتی',
     invoice: 'فاکتور فروش',
     date: 'تاریخ',
     cashier: 'صندوق‌دار',

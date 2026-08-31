@@ -210,6 +210,7 @@ export const en = {
   },
   receipt: {
     print: 'Print Receipt',
+    thermalPrint: 'Thermal Print',
     invoice: 'Sales Invoice',
     date: 'Date',
     cashier: 'Cashier',

@@ -81,6 +81,12 @@ export async function printA4Report(html: string, title: string, options?: {
     : ''
 
   const footerText = cust.printFooter || `${name} — تاریخ چاپ: ${getJalaliNow()}`
+  // Selected print font (Vazirmatn / Tahoma / Arial / Courier New ...). Only
+  // Vazirmatn is bundled; the others fall back to system fonts, which is fine.
+  const fontFamily = cust.printFontFamily || 'Vazirmatn'
+  const fontStack = fontFamily === 'Vazirmatn'
+    ? "'Vazirmatn', Tahoma, 'Segoe UI', sans-serif"
+    : `${fontFamily}, 'Vazirmatn', Tahoma, sans-serif`
 
   const invoiceSection = isInvoice && showSignature ? `
     <div class="checkbox-group">
@@ -126,7 +132,7 @@ export async function printA4Report(html: string, title: string, options?: {
     @font-face { font-family: 'Vazirmatn'; src: local('Vazirmatn'), url('/fonts/Vazirmatn-Bold.woff2') format('woff2'); font-weight: 700; font-display: swap; }
     @page { size: ${cust.printPaperSize || 'A4'}; margin: ${cust.printMarginTop || 15}mm ${cust.printMarginRight || 15}mm ${cust.printMarginBottom || 15}mm ${cust.printMarginLeft || 15}mm; }
     @media print { body { margin: 0; } }
-    body { font-family: 'Vazirmatn', sans-serif; font-size: ${cust.printFontSize || '11pt'}; line-height: ${cust.printLineSpacing || '1.5'}; direction: rtl; color: #1a1a1a; padding: 20px; }
+    body { font-family: ${fontStack}; font-size: ${cust.printFontSize || '11pt'}; line-height: ${cust.printLineSpacing || '1.5'}; direction: rtl; color: #1a1a1a; padding: 20px; }
     h1 { font-size: ${cust.printHeaderSize || '18pt'}; text-align: ${cust.printHeaderAlign || 'center'}; margin-bottom: 4px; color: ${primaryColor}; }
     .shop-name { text-align: ${cust.printHeaderAlign || 'center'}; font-size: 14pt; font-weight: 700; color: ${primaryColor}; margin-bottom: 2px; }
     .shop-phone { text-align: center; font-size: 11pt; color: #555; margin-bottom: 6px; }
