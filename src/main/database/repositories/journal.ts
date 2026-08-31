@@ -193,7 +193,13 @@ export function getJournalEntries(filters: {
   const total = (db.prepare(`SELECT COUNT(*) as c FROM journal_entries ${where}`).get(...params) as { c: number }).c
   const limit = filters.limit ?? 50
   const offset = filters.offset ?? 0
-  const entries = db.prepare(`SELECT * FROM journal_entries ${where} ORDER BY entryDate DESC, id DESC LIMIT ? OFFSET ?`).all(...params, limit, offset) as JournalEntry[]
+  // Include per-entry debit/credit totals (the UI sums these for the summary cards)
+  const entries = db.prepare(`
+    SELECT je.*,
+      (SELECT COALESCE(SUM(jel.debit), 0) FROM journal_entry_lines jel WHERE jel.entryId = je.id) as totalDebit,
+      (SELECT COALESCE(SUM(jel.credit), 0) FROM journal_entry_lines jel WHERE jel.entryId = je.id) as totalCredit
+    FROM journal_entries je ${where} ORDER BY je.entryDate DESC, je.id DESC LIMIT ? OFFSET ?
+  `).all(...params, limit, offset) as JournalEntry[]
   return { entries, total }
 }
 
@@ -202,7 +208,12 @@ export function getJournalEntryById(id: number): JournalEntryWithLines | undefin
   const db = getDatabase()
   const entry = db.prepare('SELECT * FROM journal_entries WHERE id = ?').get(id) as JournalEntry | undefined
   if (!entry) return undefined
-  const lines = db.prepare('SELECT * FROM journal_entry_lines WHERE entryId = ? ORDER BY id').all(id) as JournalLine[]
+  const lines = db.prepare(`
+    SELECT jel.*, a.code as accountCode, a.name as accountName
+    FROM journal_entry_lines jel
+    LEFT JOIN accounts a ON a.id = jel.accountId
+    WHERE jel.entryId = ? ORDER BY jel.id
+  `).all(id) as JournalLine[]
   return { ...entry, lines }
 }
 
