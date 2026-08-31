@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { fa } from '../../i18n'
+import { useTheme } from '../../hooks/useTheme'
 
 interface Props {
   onScan: (code: string) => void
@@ -13,6 +14,11 @@ export default function WebcamScanner({ onScan, onClose }: Props) {
   const [lastCode, setLastCode] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
   const scannerRef = useRef<Html5Qrcode | null>(null)
+  const { isDark } = useTheme()
+  const cardBg = isDark ? '#1e293b' : '#ffffff'
+  const cardBorder = isDark ? '#334155' : '#e2e8f0'
+  const textPrimary = isDark ? '#f1f5f9' : '#0f172a'
+  const textSecondary = isDark ? '#94a3b8' : '#64748b'
 
   const startScanner = useCallback(async () => {
     if (!containerRef.current) return
@@ -53,10 +59,10 @@ export default function WebcamScanner({ onScan, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center">
-      <div className="bg-gray-800 rounded-2xl p-6 max-w-md w-full mx-4 border border-gray-700">
+      <div className="rounded-2xl p-6 max-w-md w-full mx-4 border" style={{ backgroundColor: cardBg, borderColor: cardBorder }}>
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-bold text-white">{fa.common.webcam}</h2>
-          <button onClick={() => { stopScanner(); onClose() }} className="text-gray-400 hover:text-white text-2xl">&times;</button>
+          <h2 className="text-lg font-bold" style={{ color: textPrimary }}>{fa.common.webcam}</h2>
+          <button onClick={() => { stopScanner(); onClose() }} className="text-2xl" style={{ color: textSecondary }}>&times;</button>
         </div>
 
         <div className="rounded-lg overflow-hidden bg-black mb-4" style={{ minHeight: 240 }}>
@@ -68,9 +74,9 @@ export default function WebcamScanner({ onScan, onClose }: Props) {
         {error && <p className="text-red-400 text-sm mb-3 text-center">{error}</p>}
 
         {lastCode && (
-          <div className="bg-green-900/30 border border-green-600 rounded-lg p-3 mb-3 text-center">
-            <p className="text-green-400 text-sm">شناسایی شد:</p>
-            <p className="text-white font-bold text-lg">{lastCode}</p>
+          <div className="border rounded-lg p-3 mb-3 text-center" style={{ backgroundColor: 'rgba(34,197,94,0.12)', borderColor: '#22c55e' }}>
+            <p className="text-green-500 text-sm">شناسایی شد:</p>
+            <p className="font-bold text-lg" style={{ color: textPrimary }}>{lastCode}</p>
           </div>
         )}
 
@@ -86,7 +92,7 @@ export default function WebcamScanner({ onScan, onClose }: Props) {
           )}
         </div>
 
-        <p className="text-gray-500 text-xs text-center mt-3">
+        <p className="text-xs text-center mt-3" style={{ color: textSecondary }}>
           دوربین را روی بارکد یا QR کد نگه دارید
         </p>
       </div>

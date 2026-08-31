@@ -18,6 +18,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import type { Product } from '../../../types'
 import { useSettingsStore } from '../store/settingsStore'
 import { formatPriceFA, formatPriceComma } from '../utils/jalali'
+import { exportSvgToPng } from '../utils/exportPng'
 
 const COLOR_THEMES = {
   default: ['#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#a855f7', '#06b6d4', '#ec4899', '#8b5cf6', '#14b8a6', '#f97316'],
@@ -56,14 +57,7 @@ export default function InventoryAnalytics() {
     if (!chartRef.current) return
     const svgEl = chartRef.current.querySelector('svg')
     if (!svgEl) return
-    const svgData = new XMLSerializer().serializeToString(svgEl)
-    const canvas = document.createElement('canvas')
-    canvas.width = 800; canvas.height = 600
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-    const img = new Image()
-    img.onload = () => { ctx.fillStyle = isDark ? '#0f172a' : '#ffffff'; ctx.fillRect(0, 0, 800, 600); ctx.drawImage(img, 0, 0, 800, 600); const a = document.createElement('a'); a.download = 'inventory-analytics.png'; a.href = canvas.toDataURL('image/png'); a.click() }
-    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)))
+    exportSvgToPng(svgEl, 'inventory-analytics.png', isDark ? '#0f172a' : '#ffffff')
   }, [isDark])
 
   if (products.length === 0) {

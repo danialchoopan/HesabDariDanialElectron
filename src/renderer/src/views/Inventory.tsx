@@ -289,7 +289,7 @@ export default function Inventory({ initialTab, highlightId, onHighlightDone }: 
   }
 
   const handlePrintBarcode = async (p: Product) => {
-    const qrSvg = generateQRSvg(p.barcode || `PRD-${p.id}`, 120)
+    const qrSvg = await generateQRSvg(p.barcode || `PRD-${p.id}`, 120)
     const html = `<div style="text-align:center; padding:10px; border:1px solid #ddd; border-radius:8px; width:220px; display:inline-block;">
       <div style="font-size:8pt; color:#666;">فروشگاه</div>
       <div style="margin:5px auto; display:flex; justify-content:center;">${qrSvg}</div>
@@ -303,17 +303,18 @@ export default function Inventory({ initialTab, highlightId, onHighlightDone }: 
   const handlePrintSelectedQR = async () => {
     const selected = sortedProducts.filter(p => selectedProducts.has(p.id))
     if (selected.length === 0) return
-    const items = selected.map(p => {
-      const qrSvg = generateQRSvg(p.barcode || `PRD-${p.id}`, 100)
-      return `<div style="text-align:center; padding:8px; border:1px solid #ddd; border-radius:8px; width:200px; display:inline-block; margin:4px;">
+    const items: string[] = []
+    for (const p of selected) {
+      const qrSvg = await generateQRSvg(p.barcode || `PRD-${p.id}`, 100)
+      items.push(`<div style="text-align:center; padding:8px; border:1px solid #ddd; border-radius:8px; width:200px; display:inline-block; margin:4px;">
         <div style="font-size:7pt; color:#666;">فروشگاه</div>
         <div style="margin:4px auto; display:flex; justify-content:center;">${qrSvg}</div>
         <div style="font-size:9pt; font-weight:bold; margin-top:3px;">${p.title}</div>
         <div style="font-size:6pt; color:#666; margin-top:1px; font-family:monospace;">${p.barcode || `PRD-${p.id}`}</div>
         <div style="font-size:11pt; font-weight:bold; color:#006194; margin-top:2px;">${p.sale_price.toLocaleString('fa-IR')} تومان</div>
-      </div>`
-    }).join('')
-    await printA4Report(`<div style="display:flex; flex-wrap:wrap; justify-content:center; gap:8px;">${items}</div>`, 'لیبل‌های QR')
+      </div>`)
+    }
+    await printA4Report(`<div style="display:flex; flex-wrap:wrap; justify-content:center; gap:8px;">${items.join('')}</div>`, 'لیبل‌های QR')
     setSelectedProducts(new Set())
   }
 
