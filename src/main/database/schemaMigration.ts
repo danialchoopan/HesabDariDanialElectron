@@ -15,7 +15,9 @@
 import { getDatabase } from './connection'
 import { createBackup } from './backup'
 
-const CURRENT_VERSION = '1.10.0'
+// Tracked schema version. Mirrors the app release that introduced the latest
+// schema change so that the "downgrade" guard (db schema > installed app) works.
+const CURRENT_VERSION = '1.11.0'
 
 // Expose for external use
 export { CURRENT_VERSION }
@@ -209,7 +211,60 @@ const MIGRATIONS: Migration[] = [
     },
     down: () => {},
   },
+  {
+    version: '1.11.0',
+    description: 'Relax customer_ledger type CHECK (allow debt) — release 1.11.0',
+    up: (db) => {
+      // Older installs created customer_ledger with CHECK(type IN ('charge','payment','sale')).
+      // Recreate it to also allow 'debt' ledger entries (used by the customer credit flow).
+      try {
+        const ddlRow = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='customer_ledger'").get() as { sql?: string } | undefined
+        const ddl = ddlRow?.sql || ''
+        if (ddl && !ddl.includes("'debt'") && ddl.includes('CHECK')) {
+          db.exec(`
+            CREATE TABLE customer_ledger_new (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              customerId INTEGER NOT NULL,
+              saleId INTEGER,
+              type TEXT NOT NULL CHECK(type IN ('charge', 'payment', 'sale', 'debt')),
+              amount REAL NOT NULL,
+              description TEXT NOT NULL DEFAULT '',
+              images TEXT DEFAULT '[]',
+              createdAt TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+              FOREIGN KEY (customerId) REFERENCES customers(id),
+              FOREIGN KEY (saleId) REFERENCES sales(id)
+            )
+          `)
+          db.exec(`INSERT INTO customer_ledger_new (id, customerId, saleId, type, amount, description, images, createdAt)
+                   SELECT id, customerId, saleId, type, amount, description, images, createdAt FROM customer_ledger`)
+          db.exec('DROP TABLE customer_ledger')
+          db.exec('ALTER TABLE customer_ledger_new RENAME TO customer_ledger')
+          db.exec('CREATE INDEX IF NOT EXISTS idx_ledger_customerId ON customer_ledger(customerId)')
+        }
+      } catch (e) {
+        console.warn('[Migration] customer_ledger constraint relax failed:', e)
+      }
+    },
+    down: () => {},
+  },
 ]
+
+/**
+ * Numeric semver comparison (a/b may contain leading 'v' or partial segments).
+ * 1.10.0 > 1.9.0 → true. Returns 1 | -1 | 0.
+ */
+export function compareVersions(a: string, b: string): number {
+  const clean = (v: string) => v.replace(/^v/i, '').split('-')[0]
+  const pa = clean(a).split('.').map(n => parseInt(n, 10) || 0)
+  const pb = clean(b).split('.').map(n => parseInt(n, 10) || 0)
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const na = pa[i] || 0
+    const nb = pb[i] || 0
+    if (na > nb) return 1
+    if (na < nb) return -1
+  }
+  return 0
+}
 
 /** Get current schema version from settings table. */
 export function getSchemaVersion(): string {
@@ -227,7 +282,7 @@ function setSchemaVersion(version: string): void {
 /** Get all pending migrations from current version to latest. */
 function getPendingMigrations(): Migration[] {
   const current = getSchemaVersion()
-  return MIGRATIONS.filter(m => m.version > current)
+  return MIGRATIONS.filter(m => compareVersions(m.version, current) > 0)
 }
 
 /**
@@ -248,7 +303,14 @@ export function runMigrations(): { success: boolean; applied: string[]; errors: 
   )`)
 
   const pending = getPendingMigrations()
-  if (pending.length === 0) return { success: true, applied: [], errors: [] }
+  if (pending.length === 0) {
+    // Nothing to do, but make sure the version is recorded (fresh DBs that were
+    // created with the full schema already in place still need a version marker).
+    if (!db.prepare("SELECT value FROM settings WHERE key = 'schemaVersion'").get()) {
+      setSchemaVersion(CURRENT_VERSION)
+    }
+    return { success: true, applied: [], errors: [] }
+  }
 
   const applied: string[] = []
   const errors: string[] = []
@@ -323,20 +385,25 @@ export function getMigrationHistory(): any[] {
 
 /**
  * Validate database integrity after migration.
+ * NOTE: better-sqlite3 pragma() returns an ARRAY of { ... } rows for
+ * integrity_check / foreign_key_check, not a single object.
  */
 export function validateAfterMigration(): { valid: boolean; issues: string[] } {
   const db = getDatabase()
   const issues: string[] = []
 
   try {
-    const integrity = db.pragma('integrity_check') as any
-    if (integrity && integrity.integrity_check !== 'ok') issues.push('Integrity check failed')
+    const rows = db.pragma('integrity_check') as unknown
+    const check = Array.isArray(rows) ? rows[0] : rows as any
+    const result = check && typeof check === 'object' ? check.integrity_check : String(rows)
+    if (result !== 'ok') issues.push(`Integrity check failed: ${result}`)
   } catch (e) { issues.push(`Integrity check error: ${e}`) }
 
   try {
-    const fkCheck = db.pragma('foreign_key_check') as any
-    if (fkCheck && fkCheck.foreign_key_check !== 'ok') issues.push('Foreign key check failed')
-  } catch {}
+    const rows = db.pragma('foreign_key_check') as unknown
+    const violations = Array.isArray(rows) ? rows.length : ((rows as any)?.length ?? 0)
+    if (violations > 0) issues.push(`${violations} foreign key violations`)
+  } catch (e) { issues.push(`Foreign key check error: ${e}`) }
 
   // Check critical tables exist
   const requiredTables = ['users', 'products', 'customers', 'sales', 'accounts', 'settings', 'audit_log']

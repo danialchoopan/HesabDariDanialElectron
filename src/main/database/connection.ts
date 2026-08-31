@@ -344,7 +344,7 @@ function initializeDatabase(db: Database.Database): void {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       customerId INTEGER NOT NULL,
       saleId INTEGER,
-      type TEXT NOT NULL CHECK(type IN ('charge', 'payment', 'sale')),
+      type TEXT NOT NULL CHECK(type IN ('charge', 'payment', 'sale', 'debt')),
       amount REAL NOT NULL,
       description TEXT NOT NULL DEFAULT '',
       images TEXT DEFAULT '[]',

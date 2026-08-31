@@ -25,6 +25,31 @@ export async function createTestDb(): Promise<any> {
   const db = {
     _sql: sqlDb as SqlJsDatabase,
     exec(sql: string) { sqlDb.run(sql) },
+    pragma(stmt: string): any[] {
+      // Mimic better-sqlite3 db.pragma(): prepends PRAGMA and returns array of rows
+      const sql = /^\s*pragma\b/i.test(stmt) ? stmt : `PRAGMA ${stmt}`
+      try {
+        const res = sqlDb.exec(sql)
+        if (!res || res.length === 0) return []
+        const { columns, values } = res[0]
+        return values.map((v: any[]) => Object.fromEntries(columns.map((c: string, i: number) => [c, v[i]])))
+      } catch {
+        return []
+      }
+    },
+    transaction(fn: () => any) {
+      return () => {
+        sqlDb.run('BEGIN TRANSACTION')
+        try {
+          const result = fn()
+          sqlDb.run('COMMIT')
+          return result
+        } catch (e) {
+          sqlDb.run('ROLLBACK')
+          throw e
+        }
+      }
+    },
     prepare(sql: string) {
       return {
         run(...params: any[]) {
@@ -62,7 +87,7 @@ export async function createTestDb(): Promise<any> {
     CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY AUTOINCREMENT, barcode TEXT UNIQUE, title TEXT NOT NULL, description TEXT DEFAULT '', imageBase64 TEXT DEFAULT '', category TEXT NOT NULL DEFAULT '', subcategory TEXT DEFAULT '', unit TEXT NOT NULL DEFAULT 'number', purchase_price REAL NOT NULL DEFAULT 0, sale_price REAL NOT NULL DEFAULT 0, stock REAL NOT NULL DEFAULT 0, minStock REAL NOT NULL DEFAULT 0, isLoose INTEGER NOT NULL DEFAULT 0, isActive INTEGER NOT NULL DEFAULT 1, isSellable INTEGER NOT NULL DEFAULT 1, has_expiry INTEGER NOT NULL DEFAULT 0, expiry_date TEXT DEFAULT '', expiry_alert_days INTEGER NOT NULL DEFAULT 30, last_alerted INTEGER NOT NULL DEFAULT 0, createdAt TEXT NOT NULL DEFAULT '', updatedAt TEXT NOT NULL DEFAULT '', brand_id INTEGER DEFAULT NULL, profit_percentage REAL DEFAULT 0);
     CREATE TABLE IF NOT EXISTS customers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, phone TEXT NOT NULL DEFAULT '', balance REAL NOT NULL DEFAULT 0, address TEXT DEFAULT '', notes TEXT DEFAULT '', customerType TEXT DEFAULT 'real', description TEXT DEFAULT '', imageBase64 TEXT DEFAULT '', totalSpent REAL DEFAULT 0, totalPurchases INTEGER DEFAULT 0, is_blocked INTEGER DEFAULT 0, isActive INTEGER NOT NULL DEFAULT 1, createdAt TEXT NOT NULL DEFAULT '');
     CREATE TABLE IF NOT EXISTS categories (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, slug TEXT DEFAULT '', level INTEGER NOT NULL DEFAULT 0, is_active INTEGER NOT NULL DEFAULT 1, parent_id INTEGER DEFAULT NULL, createdAt TEXT DEFAULT '');
-    CREATE TABLE IF NOT EXISTS sales (id INTEGER PRIMARY KEY AUTOINCREMENT, invoiceNumber TEXT UNIQUE NOT NULL, userId INTEGER NOT NULL, customerId INTEGER, subtotal REAL NOT NULL DEFAULT 0, total_amount REAL NOT NULL DEFAULT 0, totalNetProfit REAL NOT NULL DEFAULT 0, paymentMethod TEXT NOT NULL DEFAULT 'cash', customerPaid REAL NOT NULL DEFAULT 0, changeAmount REAL NOT NULL DEFAULT 0, description TEXT DEFAULT '', invoiceDescription TEXT DEFAULT '', manualCustomerName TEXT DEFAULT '', saleType TEXT DEFAULT 'in-person', saleDate TEXT NOT NULL DEFAULT '', affectsInventory INTEGER NOT NULL DEFAULT 1, createdAt TEXT NOT NULL DEFAULT '');
+    CREATE TABLE IF NOT EXISTS sales (id INTEGER PRIMARY KEY AUTOINCREMENT, invoiceNumber TEXT UNIQUE NOT NULL, userId INTEGER NOT NULL, customerId INTEGER, subtotal REAL NOT NULL DEFAULT 0, total_amount REAL NOT NULL DEFAULT 0, totalNetProfit REAL NOT NULL DEFAULT 0, paymentMethod TEXT NOT NULL DEFAULT 'cash', customerPaid REAL NOT NULL DEFAULT 0, changeAmount REAL NOT NULL DEFAULT 0, description TEXT DEFAULT '', invoiceDescription TEXT DEFAULT '', manualCustomerName TEXT DEFAULT '', saleType TEXT DEFAULT 'in-person', saleDate TEXT NOT NULL DEFAULT '', affectsInventory INTEGER NOT NULL DEFAULT 1, shipping_cost REAL DEFAULT 0, shipping_tax REAL DEFAULT 0, shipping_provider TEXT DEFAULT '', tracking_number TEXT DEFAULT '', createdAt TEXT NOT NULL DEFAULT '');
     CREATE TABLE IF NOT EXISTS sale_items (id INTEGER PRIMARY KEY AUTOINCREMENT, saleId INTEGER NOT NULL, productId INTEGER NOT NULL, productTitle TEXT NOT NULL, quantity REAL NOT NULL, unitPrice REAL NOT NULL, purchasePrice REAL NOT NULL DEFAULT 0, subtotal REAL NOT NULL, netProfit REAL NOT NULL DEFAULT 0);
     CREATE TABLE IF NOT EXISTS customer_ledger (id INTEGER PRIMARY KEY AUTOINCREMENT, customerId INTEGER NOT NULL, saleId INTEGER, type TEXT NOT NULL, amount REAL NOT NULL, description TEXT NOT NULL DEFAULT '', images TEXT DEFAULT '[]', createdAt TEXT NOT NULL DEFAULT '');
     CREATE TABLE IF NOT EXISTS expenses (id INTEGER PRIMARY KEY AUTOINCREMENT, category TEXT NOT NULL, description TEXT NOT NULL, amount REAL NOT NULL, date TEXT NOT NULL, imageBase64 TEXT DEFAULT '', images TEXT DEFAULT '[]', createdAt TEXT NOT NULL DEFAULT '');
@@ -83,7 +108,9 @@ export async function createTestDb(): Promise<any> {
     CREATE TABLE IF NOT EXISTS migration_history (id INTEGER PRIMARY KEY AUTOINCREMENT, fromVersion TEXT NOT NULL, toVersion TEXT NOT NULL, description TEXT DEFAULT '', status TEXT NOT NULL DEFAULT 'applied', errorMessage TEXT DEFAULT '', createdAt TEXT NOT NULL DEFAULT '');
     CREATE TABLE IF NOT EXISTS brands (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, description TEXT DEFAULT '', isActive INTEGER NOT NULL DEFAULT 1, createdAt TEXT NOT NULL DEFAULT '');
     CREATE TABLE IF NOT EXISTS suppliers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, phone TEXT DEFAULT '', address TEXT DEFAULT '', notes TEXT DEFAULT '', balance REAL DEFAULT 0, isActive INTEGER NOT NULL DEFAULT 1, createdAt TEXT NOT NULL DEFAULT '');
-    CREATE TABLE IF NOT EXISTS supplier_ledger (id INTEGER PRIMARY KEY AUTOINCREMENT, supplierId INTEGER NOT NULL, type TEXT NOT NULL, amount REAL NOT NULL, description TEXT DEFAULT '', images TEXT DEFAULT '[]', createdAt TEXT NOT NULL DEFAULT '');
+    CREATE TABLE IF NOT EXISTS supplier_ledger (id INTEGER PRIMARY KEY AUTOINCREMENT, supplierId INTEGER NOT NULL, purchaseId INTEGER, type TEXT NOT NULL, amount REAL NOT NULL, description TEXT DEFAULT '', images TEXT DEFAULT '[]', createdAt TEXT NOT NULL DEFAULT '');
+    CREATE TABLE IF NOT EXISTS purchases (id INTEGER PRIMARY KEY AUTOINCREMENT, invoiceNumber TEXT UNIQUE NOT NULL, supplierId INTEGER NOT NULL, subtotal REAL NOT NULL DEFAULT 0, taxAmount REAL NOT NULL DEFAULT 0, discountAmount REAL NOT NULL DEFAULT 0, totalAmount REAL NOT NULL DEFAULT 0, paidAmount REAL NOT NULL DEFAULT 0, paymentMethod TEXT NOT NULL DEFAULT 'credit', status TEXT NOT NULL DEFAULT 'pending', notes TEXT DEFAULT '', purchaseDate TEXT NOT NULL DEFAULT '', createdAt TEXT NOT NULL DEFAULT '');
+    CREATE TABLE IF NOT EXISTS purchase_items (id INTEGER PRIMARY KEY AUTOINCREMENT, purchaseId INTEGER NOT NULL, productId INTEGER NOT NULL, productTitle TEXT NOT NULL, quantity REAL NOT NULL, unitCost REAL NOT NULL, subtotal REAL NOT NULL);
     CREATE TABLE IF NOT EXISTS supplier_debts (id INTEGER PRIMARY KEY AUTOINCREMENT, supplierId INTEGER NOT NULL, amount REAL NOT NULL, paidAmount REAL NOT NULL DEFAULT 0, date TEXT NOT NULL, description TEXT DEFAULT '', reference TEXT DEFAULT '', status TEXT NOT NULL DEFAULT 'pending', notes TEXT DEFAULT '', createdAt TEXT NOT NULL DEFAULT '');
     CREATE TABLE IF NOT EXISTS supplier_debt_payments (id INTEGER PRIMARY KEY AUTOINCREMENT, debtId INTEGER NOT NULL, amount REAL NOT NULL, paymentDate TEXT NOT NULL, method TEXT DEFAULT 'cash', reference TEXT DEFAULT '', notes TEXT DEFAULT '', createdAt TEXT NOT NULL DEFAULT '');
     CREATE TABLE IF NOT EXISTS bank_accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, account_number TEXT DEFAULT '', bank_name TEXT DEFAULT '', branch TEXT DEFAULT '', account_type TEXT DEFAULT 'current', initial_balance REAL DEFAULT 0, current_balance REAL DEFAULT 0, currency TEXT DEFAULT 'IRR', iban TEXT DEFAULT '', swift_code TEXT DEFAULT '', status TEXT DEFAULT 'active', notes TEXT DEFAULT '', createdAt TEXT NOT NULL DEFAULT '', updatedAt TEXT NOT NULL DEFAULT '');
