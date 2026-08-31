@@ -6,8 +6,7 @@
 
 > **English | [فارسی](README.md)**
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue)](https://github.com/danialchoopan/DukanElectronJS)
-[![License](https://img.shields.io/badge/license-MIT-green)](#)
+[![Version](https://img.shields.io/badge/version-1.13.0-blue)](https://github.com/danialchoopan/HesabDariDanialElectron)
 [![Electron](https://img.shields.io/badge/Electron-33-purple)](https://electronjs.org)
 [![React](https://img.shields.io/badge/React-18-cyan)](https://reactjs.org)
 
@@ -65,9 +64,9 @@
 - Professional calculator with history and currency conversion (Ctrl+M)
 
 ### Inventory
-- Product management with barcode and QR
-- Camera scanner for barcode reading
-- Barcode and QR label printing
+- Product management with real, scannable barcode and QR codes
+- Camera scanner for reading barcodes and QR codes in the POS
+- Barcode and QR label printing (single and batch) on A4
 - Inventory reports and warehouse value
 - Slow-moving items tracking
 - Excel file import (.xlsx) with column mapping and editable preview
@@ -75,11 +74,7 @@
 - Auto profit percentage calculation and price rounding
 - Inventory adjustments with auto audit trail
 - Expiry date products with automatic alerts
-- A4 printing and Excel export
-- Audit log with full history
-- Inventory adjustments with auto audit trail
-- Expiry date products with automatic alerts
-- A4 printing and Excel export
+- A4 printing, Excel (.xlsx) export, and PNG chart export
 - Audit log with full history
 
 ### Sales
@@ -114,13 +109,31 @@
   - Category profit margins
   - Customer purchase patterns
 
+### Printing
+- **A4 printing** as the main invoice/report print, fully customizable:
+  - Templates (default, classic, modern, minimal, elegant, corporate, warm) + your own custom templates
+  - Accent color, decorative border, paper size (A4/A5/Letter), page margins
+  - Print font (Vazirmatn / Tahoma / Arial / Courier New)
+  - Logo, signature, watermark, header fields, footer text
+  - Table style (bordered / clean) and optional invoice QR code
+  - Live preview that simulates white paper (readable in both dark/light themes)
+- **Thermal receipt printing** for thermal printers:
+  - Paper width 80mm or 58mm
+  - Toggle logo, customer, and change rows
+  - Custom header line on the receipt
+- Clear separation: A4 is the main print, thermal is the receipt print
+- Real Excel (.xlsx) export from all reports and PNG chart export
+
 ### Security & Backup
 - AES-256 encryption
 - Digital file signatures
-- Auto backup with cleanup
-- USB backup with auto detection
-- Restore points with integrity verification (SHA-256)
-- Automatic database migration on version upgrade
+- Auto backup with cleanup and configurable interval (daily/weekly/monthly)
+- WAL-consistent backups (no lost recent transactions)
+- Restore with integrity, hash, and automatic version migration validation
+- Restore points with integrity verification (SHA-256) and restore support
+- Versioned automatic database migration on upgrade
+- Exact double-entry accounting (debit == credit) on every journal entry
+- Integrated demo data for quick onboarding and testing
 - Comprehensive audit log with search and filter
 - Role-Based Access Control (RBAC — 35 permissions)
 
@@ -186,8 +199,8 @@
 ## Quick Install
 
 ```bash
-git clone https://github.com/danialchoopan/DukanElectronJS.git
-cd DukanElectronJS
+git clone https://github.com/danialchoopan/HesabDariDanialElectron.git
+cd HesabDariDanialElectron
 npm install
 npm run dev
 ```
@@ -215,12 +228,6 @@ npm run dev
 | [docs/doc-accounting.html](docs/doc-accounting.html) | English | Accounting system |
 | [docs/doc-backup.html](docs/doc-backup.html) | English | Backup & migration |
 | [docs/doc-ui.html](docs/doc-ui.html) | English | UI components |
-
----
-
-## License
-
-MIT License — free for all uses.
 
 ---
 
