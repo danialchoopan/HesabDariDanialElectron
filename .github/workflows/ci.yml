@@ -1,8 +1,12 @@
 name: Build & Test
 
+# develop is the single source of truth for the code. production is just a
+# CI/CD mirror: it always points at the same commit as develop, and pushing to
+# it runs the same build+test pipeline. Actual releases are created by pushing
+# a version tag (see release.yml), which builds the installers.
 on:
   push:
-    branches: [develop]
+    branches: [develop, production]
   pull_request:
     branches: [develop, production]
 
