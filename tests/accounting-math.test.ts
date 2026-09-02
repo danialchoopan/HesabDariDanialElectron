@@ -501,6 +501,18 @@ describe('Split / mixed payments', () => {
     expect(summary.cardTotal).toBe(200)              // the bank share of the split sale
     expect(summary.ledgerTotal).toBe(0)
   })
+
+  it('returned sales carry the customer name and real/legal type for the invoice', () => {
+    const sale = sales.createSale({
+      userId: 1, customerId: 1,
+      items: [{ productId: 1, productTitle: 'Widget', quantity: 1, unitPrice: 500, purchasePrice: 300 }],
+      paymentMethod: 'cash', customerPaid: 500, saleDate: '2026-07-05 12:00:00',
+    })
+    const fetched = sales.getSaleById(sale.id)!
+    expect(fetched.customerName).toBe('Ahmad')
+    expect(fetched.customerType).toBe('real')
+    expect(fetched.payments).toEqual([{ method: 'cash', amount: 500 }])
+  })
 })
 
 describe('Trial balance & general ledger', () => {

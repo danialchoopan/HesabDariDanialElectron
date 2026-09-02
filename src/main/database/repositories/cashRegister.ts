@@ -1,6 +1,24 @@
 import { getDatabase } from '../connection'
 import type { DailyCashRegister } from '../../../types'
 
+/** Cash received on a given day: the exact cash share of every sale
+ *  (from sale_payments when present, otherwise the legacy single-cash row). */
+function cashInForDate(date: string): number {
+  const db = getDatabase()
+  const split = (db.prepare(`
+    SELECT COALESCE(SUM(sp.amount), 0) as t
+    FROM sale_payments sp JOIN sales s ON s.id = sp.saleId
+    WHERE sp.method = 'cash' AND date(s.createdAt) = ?
+  `).get(date) as { t: number }).t
+  const legacy = (db.prepare(`
+    SELECT COALESCE(SUM(s.customerPaid), 0) as t
+    FROM sales s
+    WHERE s.paymentMethod = 'cash' AND date(s.createdAt) = ?
+      AND NOT EXISTS (SELECT 1 FROM sale_payments sp WHERE sp.saleId = s.id)
+  `).get(date) as { t: number }).t
+  return split + legacy
+}
+
 export function getTodayRegister(): DailyCashRegister {
   const db = getDatabase()
   const today = new Date().toISOString().split('T')[0]
@@ -11,7 +29,7 @@ export function getTodayRegister(): DailyCashRegister {
     return { date: today, openingBalance: 0, totalCashIn: 0, totalCashOut: 0, closingBalance: 0, expectedBalance: 0, difference: 0, isClosed: false }
   }
 
-  const cashSales = (db.prepare("SELECT COALESCE(SUM(customerPaid), 0) as total FROM sales WHERE paymentMethod = 'cash' AND date(createdAt) = ?").get(today) as { total: number }).total
+  const cashSales = cashInForDate(today)
   const cashRefunds = 0
 
   return {
@@ -51,7 +69,7 @@ export function getRegisterHistory(startDate: string, endDate: string): DailyCas
     const date = row.date as string
     const openingBalance = row.openingBalance as number
     const closingBalance = row.closingBalance as number
-    const cashIn = (db.prepare("SELECT COALESCE(SUM(customerPaid), 0) as t FROM sales WHERE paymentMethod = 'cash' AND date(createdAt) = ?").get(date) as { t: number }).t
+    const cashIn = cashInForDate(date)
     const cashOut = 0
     return {
       date,

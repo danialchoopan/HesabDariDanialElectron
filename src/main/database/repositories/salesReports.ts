@@ -229,20 +229,35 @@ function getSalesSummary(startDate: string, endDate: string) {
     SELECT
       COALESCE(SUM(total_amount), 0) as totalSales,
       COUNT(*) as ordersCount,
-      CASE WHEN COUNT(*) > 0 THEN SUM(total_amount) / COUNT(*) ELSE 0 END as avgOrderValue,
-      COALESCE(SUM(CASE WHEN paymentMethod = 'cash' THEN total_amount ELSE 0 END), 0) as cashSales,
-      COALESCE(SUM(CASE WHEN paymentMethod = 'card' THEN total_amount ELSE 0 END), 0) as cardSales,
-      COALESCE(SUM(CASE WHEN paymentMethod = 'ledger' THEN total_amount ELSE 0 END), 0) as ledgerSales
+      CASE WHEN COUNT(*) > 0 THEN SUM(total_amount) / COUNT(*) ELSE 0 END as avgOrderValue
     FROM sales
     WHERE saleDate >= ? AND saleDate <= ?
   `).get(startDate, endDate) as any
+
+  // Channel totals honour the exact payment split (sale_payments) and fall
+  // back to the single method on legacy rows that have no split.
+  const split = db.prepare(`
+    SELECT sp.method, COALESCE(SUM(sp.amount), 0) as amt
+    FROM sale_payments sp JOIN sales s ON s.id = sp.saleId
+    WHERE s.saleDate >= ? AND s.saleDate <= ? GROUP BY sp.method
+  `).all(startDate, endDate) as { method: string; amt: number }[]
+  const legacy = db.prepare(`
+    SELECT s.paymentMethod, COALESCE(SUM(s.total_amount), 0) as amt
+    FROM sales s
+    WHERE s.saleDate >= ? AND s.saleDate <= ? AND NOT EXISTS (SELECT 1 FROM sale_payments sp WHERE sp.saleId = s.id)
+    GROUP BY s.paymentMethod
+  `).all(startDate, endDate) as { paymentMethod: string; amt: number }[]
+  const byMethod: Record<string, number> = {}
+  for (const r of split) byMethod[r.method] = (byMethod[r.method] || 0) + r.amt
+  for (const r of legacy) byMethod[r.paymentMethod] = (byMethod[r.paymentMethod] || 0) + r.amt
+
   return {
     totalSales: row.totalSales || 0,
     ordersCount: row.ordersCount || 0,
     avgOrderValue: row.avgOrderValue || 0,
-    cashSales: row.cashSales || 0,
-    cardSales: row.cardSales || 0,
-    ledgerSales: row.ledgerSales || 0,
+    cashSales: byMethod['cash'] || 0,
+    cardSales: (byMethod['card'] || 0) + (byMethod['card_to_card'] || 0),
+    ledgerSales: byMethod['ledger'] || 0,
   }
 }
 
