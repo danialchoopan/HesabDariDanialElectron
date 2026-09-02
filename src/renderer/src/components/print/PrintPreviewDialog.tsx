@@ -62,6 +62,15 @@ export default function PrintPreviewDialog() {
     })()
   }, [pending])
 
+  // Escape always dismisses the preview — declared BEFORE the early return so
+  // the hook order never changes between renders (a crash here froze the app).
+  useEffect(() => {
+    if (!pending) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { pending.onClose?.(); clear() } }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [pending, clear])
+
   if (!pending) return null
 
   const t = templates.find(x => x.key === activeTemplate) || templates[0]
@@ -132,15 +141,6 @@ export default function PrintPreviewDialog() {
   }
 
   const handleClose = () => { pending.onClose?.(); clear() }
-
-  // Escape must always be able to dismiss this overlay (never leave the app
-  // blocked if the pointer is unavailable).
-  useEffect(() => {
-    if (!pending) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') handleClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [pending])
 
   const saveShopName = () => {
     setTemplateShopNames(prev => ({ ...prev, [activeTemplate]: tempShopName }))
