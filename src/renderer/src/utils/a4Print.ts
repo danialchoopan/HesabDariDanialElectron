@@ -76,7 +76,7 @@ export async function printA4Report(html: string, title: string, options?: {
   const showTax = cust.printShowTax !== 'false'
 
   const logoHtml = cust.printLogo
-    ? `<img src="${cust.printLogo}" style="max-height: 60px; max-width: 200px; display: block; margin: 0 auto 8px auto;" />`
+    ? `<div class="brand-logo"><img src="${cust.printLogo}" alt="logo" /></div>`
     : ''
 
   const wmOpacity = cust.printWatermarkOpacity ? (parseInt(cust.printWatermarkOpacity) / 100) : 0.1
@@ -98,100 +98,141 @@ export async function printA4Report(html: string, title: string, options?: {
   const buyerLegal = options?.customerType === 'legal'
 
   const invoiceSection = isInvoice && showSignature ? `
-    ${options?.customerName ? `<div style="font-size: 11pt; margin: 10px 0 2px 0;"><strong>خریدار:</strong> ${options.customerName}</div>` : ''}
-    <div class="checkbox-group">
-      <label><input type="checkbox" ${buyerReal ? 'checked' : ''} /> حقیقی</label>
-      <label><input type="checkbox" ${buyerLegal ? 'checked' : ''} /> حقوقی</label>
+    <div class="buyer-panel">
+      <div class="buyer-name">
+        <span class="lbl">خریدار</span>
+        <strong>${options?.customerName || '—'}</strong>
+      </div>
+      <div class="buyer-type">
+        <span class="type ${buyerReal ? 'on' : ''}">حقیقی</span>
+        <span class="type ${buyerLegal ? 'on' : ''}">حقوقی</span>
+      </div>
     </div>
-    <div>
-      <strong style="font-size: 10pt;">توضیحات:</strong>
+    <div class="note-box">
+      <span class="lbl">توضیحات</span>
       <div class="description-box"></div>
     </div>
     <div class="signature-row">
       <div class="signature-box">
-        <div class="signature-line">محل امضای خریدار</div>
+        <div class="signature-line">مهر و امضای خریدار</div>
       </div>
       <div class="signature-box">
         ${cust.printSignature ? `<img src="${cust.printSignature}" class="signature-img" />` : ''}
-        <div class="signature-line">محل امضای فروشنده</div>
+        <div class="signature-line">مهر و امضای فروشنده</div>
       </div>
     </div>
   ` : ''
 
+  const headerFields = [cust.printHeaderField1, cust.printHeaderField2, cust.printHeaderField3]
+    .filter(Boolean)
+    .map(f => `<div>${f}</div>`)
+    .join('')
+
   const taxInfo = taxRate > 0 && showTax
     ? `<div style="font-size: 10pt; color: #555; margin-top: 8px; padding: 8px; background: #f8f9fa; border-radius: 4px;"><strong>مالیات بر ارزش افزوده:</strong> ${taxRate}% (شامل قیمت نهایی می‌باشد)</div>`
     : ''
-
-  const headerFields = [cust.printHeaderField1, cust.printHeaderField2, cust.printHeaderField3]
-    .filter(Boolean)
-    .map(f => `<div style="margin: 4px 0; font-size: 10pt; border-bottom: 1px dashed #999;">${f}</div>`)
-    .join('')
-
-  let borderCSS = ''
-  if (cust.printBorderStyle === 'simple') borderCSS = `body { border-top: 3px solid ${primaryColor}; border-bottom: 3px solid ${primaryColor}; padding-top: 10px; }`
-  if (cust.printBorderStyle === 'double') borderCSS = `body { border-top: 6px double ${primaryColor}; border-bottom: 6px double ${primaryColor}; padding: 10px 0; }`
-  if (cust.printBorderStyle === 'decorative') borderCSS = `body { border-top: 8px solid ${primaryColor}; border-bottom: 4px solid ${primaryColor}; padding: 10px 0; }`
-
-  // Table style: 'bordered' (default) or 'clean' (no cell borders)
-  const tableCSS = cust.printTableStyle === 'clean'
-    ? `table { width: 100%; border-collapse: collapse; margin-bottom: 12px; } th { padding: 8px 6px; text-align: right; font-size: 10pt; } td { padding: 6px; text-align: right; font-size: 10pt; }`
-    : `table { width: 100%; border-collapse: collapse; margin-bottom: 12px; } th { background: #f0f4f8; padding: 8px 6px; text-align: right; font-size: 10pt; border-bottom: 2px solid #333; } td { padding: 6px; text-align: right; font-size: 10pt; border-bottom: 1px solid #ddd; }`
 
   // Optional QR code on the invoice (e.g. encodes the invoice number)
   let qrHtml = ''
   if (cust.printShowInvoiceQr === 'true' && options?.qrData) {
     try {
       const qrDataUrl = await generateQRDataURL(options.qrData, 160)
-      qrHtml = `<div style="text-align:center; margin-top:14px;"><img src="${qrDataUrl}" style="width:80px; height:80px;" alt="QR"/><div style="font-size:7pt; color:#999; margin-top:2px;">${options.qrData}</div></div>`
+      qrHtml = `<div class="qr"><img src="${qrDataUrl}" alt="QR" /><div class="qr-data">${options.qrData}</div></div>`
     } catch { /* keep no QR if generation fails */ }
   }
 
-  win.document.write(`<!DOCTYPE html>
-<html dir="rtl" lang="fa">
-<head>
-  <meta charset="utf-8">
-  <title>${title}</title>
+  // Page-edge accent (border style template)
+  let borderCSS = ''
+  if (cust.printBorderStyle === 'simple') borderCSS = 'body { border-top: 2px solid ' + primaryColor + '; border-bottom: 2px solid ' + primaryColor + '; }'
+  if (cust.printBorderStyle === 'double') borderCSS = 'body { border-top: 4px double ' + primaryColor + '; border-bottom: 4px double ' + primaryColor + '; }'
+  if (cust.printBorderStyle === 'decorative') borderCSS = 'body { border-top: 6px solid ' + primaryColor + '; border-bottom: 3px solid ' + primaryColor + '; }'
+
+  // ── Professional invoice/report layout ───────────────────────
+  // The whole print is wrapped in .sheet; the shop header sits on top, then a
+  // title band, then the caller's content (tables use .header-info / tables),
+  // then buyer panel + signature (for invoices), QR and footer.
+  const bodyShell = `
   <style>
     @font-face { font-family: 'Vazirmatn'; src: local('Vazirmatn'), url('/fonts/Vazirmatn-Regular.woff2') format('woff2'); font-weight: 400; font-display: swap; }
     @font-face { font-family: 'Vazirmatn'; src: local('Vazirmatn'), url('/fonts/Vazirmatn-Bold.woff2') format('woff2'); font-weight: 700; font-display: swap; }
     @page { size: ${cust.printPaperSize || 'A4'}; margin: ${cust.printMarginTop || 15}mm ${cust.printMarginRight || 15}mm ${cust.printMarginBottom || 15}mm ${cust.printMarginLeft || 15}mm; }
     @media print { body { margin: 0; } }
-    body { font-family: ${fontStack}; font-size: ${cust.printFontSize || '11pt'}; line-height: ${cust.printLineSpacing || '1.5'}; direction: rtl; color: #1a1a1a; padding: 20px; }
-    h1 { font-size: ${cust.printHeaderSize || '18pt'}; text-align: ${cust.printHeaderAlign || 'center'}; margin-bottom: 4px; color: ${primaryColor}; }
-    .shop-name { text-align: ${cust.printHeaderAlign || 'center'}; font-size: 14pt; font-weight: 700; color: ${primaryColor}; margin-bottom: 2px; }
-    .shop-phone { text-align: center; font-size: 11pt; color: #555; margin-bottom: 6px; }
-    .report-title { text-align: ${cust.printHeaderAlign || 'center'}; font-size: 12pt; font-weight: 600; color: #333; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid ${primaryColor}; }
-    h2 { font-size: 12pt; margin-bottom: 6px; color: #333; margin-top: 16px; }
-    ${tableCSS}
-    .total-row { font-weight: bold; background: #e8f0fe; }
-    .footer { text-align: center; margin-top: 20px; font-size: 9pt; color: #666; border-top: 1px solid #ccc; padding-top: 8px; }
-    .header-info { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 10pt; color: #555; }
-    .checkbox-group { display: flex; gap: 24px; margin: 16px 0; font-size: 10pt; }
-    .checkbox-group label { display: flex; align-items: center; gap: 6px; }
-    .checkbox-group input[type="checkbox"] { width: 14px; height: 14px; accent-color: ${primaryColor}; }
-    .description-box { border: 1px solid #999; border-radius: 4px; min-height: 60px; padding: 8px; margin: 8px 0; font-size: 10pt; color: #999; }
-    .signature-row { display: flex; justify-content: space-between; margin-top: 32px; padding-top: 12px; border-top: 1px solid #ccc; }
+    * { box-sizing: border-box; }
+    body { font-family: ${fontStack}; font-size: ${cust.printFontSize || '10.5pt'}; line-height: ${cust.printLineSpacing || '1.6'}; direction: rtl; color: #1f2937; background: #fff; padding: 4px; margin: 0; }
+    .app-header { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding-bottom: 10px; border-bottom: 2px solid ${primaryColor}; }
+    .brand-logo { flex: 0 0 auto; }
+    .brand-logo img { max-height: 62px; max-width: 180px; }
+    .shop-center { flex: 1; text-align: center; }
+    .shop-name { font-size: 17pt; font-weight: 800; color: ${primaryColor}; letter-spacing: .2px; }
+    .shop-contact { font-size: 10pt; color: #6b7280; margin-top: 3px; }
+    .shop-contact span { margin: 0 6px; }
+    .header-fields { margin-top: 5px; font-size: 9.5pt; color: #6b7280; }
+    .doc-title { text-align: center; font-size: 13.5pt; font-weight: 800; color: #111827; margin: 12px 0 10px; }
+    .doc-title::after { content: ''; display: block; width: 90px; height: 3px; margin: 6px auto 0; border-radius: 2px; background: ${primaryColor}; }
+    h2, h3 { color: #111827; margin: 14px 0 6px; }
+    /* meta line produced by invoice callers */
+    .header-info { display: flex; flex-wrap: wrap; align-items: center; background: #f4f7fb; border: 1px solid #e3e9f2; border-radius: 8px; padding: 7px 6px; margin-bottom: 12px; font-size: 9.5pt; color: #4b5563; }
+    .header-info span { padding: 1px 10px; border-left: 1px solid #d7dde5; white-space: nowrap; }
+    .header-info span:last-child { border-left: none; }
+    /* tables */
+    table { width: 100%; border-collapse: separate; border-spacing: 0; margin: 4px 0 14px; }
+    thead th { background: ${primaryColor}; color: #fff; font-weight: 700; font-size: 9.5pt; padding: 8px 9px; text-align: right; }
+    thead th:first-child { border-top-right-radius: 6px; }
+    thead th:last-child { border-top-left-radius: 6px; }
+    tbody td { padding: 7px 9px; border-bottom: 1px solid #e9edf2; font-size: 10pt; vertical-align: top; }
+    tbody tr:last-child td { border-bottom: 1px solid ${primaryColor}; }
+    tbody tr:nth-child(even) td { background: #f8fafc; }
+    .total-row { font-weight: 700; background: #eef4ff; }
+    /* invoice panels */
+    .buyer-panel { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; padding: 9px 12px; background: #f4f7fb; border: 1px solid #e3e9f2; border-radius: 8px; }
+    .lbl { display: block; font-size: 8.5pt; color: #6b7280; margin-bottom: 1px; }
+    .buyer-name strong { font-size: 11pt; color: #111827; }
+    .buyer-type .type { display: inline-block; margin-right: 6px; padding: 2px 14px; border-radius: 20px; font-size: 9.5pt; color: #9aa3af; border: 1px solid #d5dbe3; }
+    .buyer-type .type.on { color: #fff; background: ${primaryColor}; border-color: ${primaryColor}; }
+    .note-box { margin-top: 10px; }
+    .description-box { border: 1px dashed #c3cbd4; border-radius: 6px; min-height: 56px; padding: 8px; font-size: 9.5pt; color: #6b7280; }
+    .signature-row { display: flex; justify-content: space-between; gap: 16px; margin-top: 26px; padding-top: 10px; border-top: 1px solid #e5e7eb; }
     .signature-box { text-align: center; width: 45%; }
-    .signature-line { border-top: 1px solid #333; margin-top: 32px; padding-top: 4px; font-size: 9pt; color: #666; }
-    .signature-img { max-width: 120px; max-height: 50px; margin-bottom: 4px; display: block; margin-left: auto; margin-right: auto; }
+    .signature-line { border-top: 1px solid #334155; margin-top: 30px; padding-top: 4px; font-size: 9pt; color: #6b7280; }
+    .signature-img { max-width: 120px; max-height: 50px; display: block; margin: 0 auto 4px; }
+    .qr { text-align: center; margin-top: 14px; }
+    .qr img { width: 78px; height: 78px; }
+    .qr-data { font-size: 7.5pt; color: #9aa3af; margin-top: 2px; }
+    .footer { margin-top: 16px; padding-top: 8px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 9pt; color: #6b7280; }
+    ${cust.printTableStyle === 'clean'
+      ? 'table thead th { background: transparent; color: ' + primaryColor + '; border-bottom: 2px solid ' + primaryColor + '; border-radius: 0; } tbody tr:nth-child(even) td, tbody td { border-bottom: 1px solid #eef1f5; }'
+      : ''}
     ${borderCSS}
     ${watermarkStyle}
   </style>
 </head>
 <body>
-  ${logoHtml}
-  ${headerFields}
-  <div class="shop-name">${name}</div>
-  ${phone ? `<div class="shop-phone">تلفن: ${phone}</div>` : ''}
-  ${cachedShopAddress ? `<div class="shop-phone">آدرس: ${cachedShopAddress}</div>` : ''}
-  <div class="report-title">${title}</div>
+  <div class="app-header">
+    ${logoHtml}
+    <div class="shop-center">
+      <div class="shop-name">${name}</div>
+      <div class="shop-contact">
+        ${phone ? `<span>تلفن: ${phone}</span>` : ''}
+        ${cachedShopAddress ? `<span>${cachedShopAddress}</span>` : ''}
+      </div>
+      ${headerFields ? `<div class="header-fields">${headerFields}</div>` : ''}
+    </div>
+  </div>
+  <div class="doc-title">${title}</div>
   ${taxInfo}
   ${html}
   ${invoiceSection}
   ${qrHtml}
   <div class="footer">${footerText}</div>
 </body>
-</html>`)
+</html>`
+
+  win.document.write(`<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+  <meta charset="utf-8">
+  <title>${title}</title>
+${bodyShell}`)
   win.document.close()
   win.print()
 }

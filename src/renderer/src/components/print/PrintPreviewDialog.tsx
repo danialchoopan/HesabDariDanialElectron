@@ -76,7 +76,6 @@ export default function PrintPreviewDialog() {
   const t = templates.find(x => x.key === activeTemplate) || templates[0]
   const color = customSettings[activeTemplate]?.printColorScheme || t.color
   const borderStyle = customSettings[activeTemplate]?.printBorderStyle || t.border
-  const align = customSettings[activeTemplate]?.printHeaderAlign || t.align
   const activeShopName = templateShopNames[activeTemplate] || shopName
 
   const getBorderCSS = () => {
@@ -99,12 +98,27 @@ export default function PrintPreviewDialog() {
       </div>` : ''
 
     return `
-      <div style="font-family:'Vazirmatn',sans-serif;font-size:11pt;line-height:1.5;color:#1a1a1a;padding:16px;border-top:${getBorderCSS()}">
-        <div style="text-align:${align};font-size:14pt;font-weight:700;color:${color};margin-bottom:2px">${activeShopName}</div>
-        <div style="text-align:center;font-size:12pt;font-weight:700;color:${color};margin-bottom:4px">${pending.title}</div>
+      <style>
+        table{width:100%;border-collapse:separate;border-spacing:0;margin:6px 0 12px}
+        table thead th{background:${color};color:#fff;padding:6px 8px;font-size:9pt;text-align:right}
+        table tbody td{padding:6px 8px;border-bottom:1px solid #eef1f5;font-size:9pt;vertical-align:top}
+        table tbody tr:last-child td{border-bottom:1px solid ${color}}
+        .header-info{display:flex;flex-wrap:wrap;background:#f4f7fb;border:1px solid #e3e9f2;border-radius:6px;padding:6px 4px;margin:6px 0 10px;font-size:8.5pt;color:#4b5563}
+        .header-info span{padding:0 9px;border-left:1px solid #e3e9f2;white-space:nowrap}
+        .header-info span:last-child{border-left:none}
+        .total-row{background:#eef4ff;font-weight:700}
+      </style>
+      <div style="font-family:'Vazirmatn',sans-serif;font-size:11pt;line-height:1.6;color:#1f2937;padding:16px;border-top:${getBorderCSS()}">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:8px;border-bottom:2px solid ${color}">
+          <div style="flex:1;text-align:center">
+            <div style="font-size:15pt;font-weight:800;color:${color}">${activeShopName}</div>
+          </div>
+        </div>
+        <div style="text-align:center;font-size:12.5pt;font-weight:800;color:#111827;margin:10px 0 6px">${pending.title}</div>
+        <div style="width:70px;height:3px;margin:0 auto 10px;background:${color};border-radius:2px"></div>
         ${pending.html}
         ${signatureHtml}
-        <div style="text-align:center;margin-top:16px;font-size:8pt;color:#666;border-top:1px solid #ccc;padding-top:8px">تاریخ چاپ: ${formatDateNow()}</div>
+        <div style="text-align:center;margin-top:14px;font-size:8pt;color:#6b7280;border-top:1px solid #e5e7eb;padding-top:8px">تاریخ چاپ: ${formatDateNow()}</div>
       </div>`
   }
 
