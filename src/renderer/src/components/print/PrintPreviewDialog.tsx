@@ -133,6 +133,15 @@ export default function PrintPreviewDialog() {
 
   const handleClose = () => { pending.onClose?.(); clear() }
 
+  // Escape must always be able to dismiss this overlay (never leave the app
+  // blocked if the pointer is unavailable).
+  useEffect(() => {
+    if (!pending) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') handleClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [pending])
+
   const saveShopName = () => {
     setTemplateShopNames(prev => ({ ...prev, [activeTemplate]: tempShopName }))
     window.api.settings.set('printTemplateShopNames', JSON.stringify({ ...templateShopNames, [activeTemplate]: tempShopName }))

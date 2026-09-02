@@ -80,14 +80,12 @@ export function createSale(input: SaleInput): Sale {
         ? 'card'
         : 'ledger'
 
-  // customerPaid = amount settled up front (not added to debt).
-  const customerPaid = arTotal > 0 ? cashTotal + bankTotal : input.customerPaid
-  // In split mode amounts are the exact applied shares, so no cash change.
-  const changeAmount = arTotal > 0 || (input.payments && input.payments.length > 0)
-    ? 0
-    : input.paymentMethod === 'cash'
-      ? Math.max(0, input.customerPaid - total_amount)
-      : 0
+  // A pure-cash sale may take more than the total and give change back.
+  const singleCash = cashTotal > 0 && bankTotal === 0 && arTotal === 0
+  // customerPaid = amount tendered up front (for cash this is what the buyer
+  // handed over; otherwise the share settled now and not added to debt).
+  const customerPaid = singleCash ? (input.customerPaid ?? cashTotal) : (cashTotal + bankTotal)
+  const changeAmount = singleCash ? Math.max(0, Math.round(input.customerPaid || 0) - Math.round(total_amount)) : 0
 
   const createSaleTx = db.transaction(() => {
     const saleResult = db.prepare(`

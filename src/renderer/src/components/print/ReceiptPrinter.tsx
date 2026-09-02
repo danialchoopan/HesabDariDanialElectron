@@ -72,9 +72,16 @@ export default function ReceiptPrinter({ sale, storeName, storeAddress, storePho
 
   const previewHTML = generateReceiptHTML(base)
 
+  // Close on backdrop click or Escape so the modal can never trap the UI.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center no-print">
-      <div className="rounded-2xl p-6 max-w-sm w-full mx-4 border-2" style={{
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center no-print" onClick={onClose}>
+      <div className="rounded-2xl p-6 max-w-sm w-full mx-4 border-2" onClick={(e) => e.stopPropagation()} style={{
         backgroundColor: isDark ? '#1e293b' : '#ffffff',
         borderColor: isDark ? '#334155' : '#e2e8f0',
         boxShadow: '0 20px 60px rgba(0,0,0,0.3)',

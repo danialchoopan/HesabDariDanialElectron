@@ -1,15 +1,14 @@
 /**
- * PaymentPanel — payment method selection and split-payment entry for the POS.
+ * PaymentPanel — payment method selection for the POS.
  *
- * A customer can settle an invoice with a SINGLE method (cash, card reader,
- * card-to-card, or ledger/debt) or with a COMBINATION — e.g. part card-to-card
- * and part added to the customer's debt. The panel lets you toggle any number
- * of methods, type an amount for each, and shows the remaining amount that must
- * be allocated. The invoice is only ready when the allocated total matches.
+ * Two modes:
+ *   1. SINGLE (default, quick): pick ONE method with a single tap — cash, card
+ *      reader, card-to-card, or credit (ledger). Switching methods is one tap,
+ *      exactly like the classic POS. Cash shows tendered amount + change.
+ *   2. SPLIT (پرداخت ترکیبی): allocate the invoice across several methods
+ *      (e.g. part card-to-card + part debt) with a live remaining indicator.
  *
- * When "ledger" is toggled, a customer must be chosen first (the remainder is
- * added to their account). Cash amounts may over-tender; the resulting change
- * is shown.
+ * When "ledger" is chosen a customer must be selected first.
  */
 import { useState, useEffect, useMemo } from 'react'
 import { useCartStore } from '../../store/cartStore'
@@ -22,7 +21,7 @@ import { paymentMethodLabel, paymentColor, normalizePayments } from '../../utils
 type PayMethod = PaymentMethod
 
 interface Props {
-  onPay: (payments: SalePayment[]) => void
+  onPay: (payments: SalePayment[], cashTendered?: number) => void
   selectedCustomer: Customer | null
   onSelectCustomer: (c: Customer | null) => void
   /** Walk-in (manual) buyer name to print on the invoice — editable here. */
@@ -30,16 +29,20 @@ interface Props {
   onWalkInNameChange?: (name: string) => void
 }
 
-const METHODS: { key: PayMethod; icon: JSX.Element }[] = [
-  { key: 'cash', icon: <MoneyIcon className="w-5 h-5" /> },
-  { key: 'card', icon: <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg> },
-  { key: 'card_to_card', icon: <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 10l-3 2 3 2M17 14l3-2-3-2"/><path d="M4 12h8m0 0h8"/></svg> },
-  { key: 'ledger', icon: <BookIcon className="w-5 h-5" /> },
-]
+const METHOD_KEYS: PayMethod[] = ['cash', 'card', 'card_to_card', 'ledger']
+const icons: Record<PayMethod, JSX.Element> = {
+  cash: <MoneyIcon className="w-5 h-5" />,
+  card: <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>,
+  card_to_card: <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 10l-3 2 3 2M17 14l3-2-3-2"/><path d="M4 12h8m0 0h8"/></svg>,
+  ledger: <BookIcon className="w-5 h-5" />,
+}
 
 export default function PaymentPanel({ onPay, selectedCustomer, onSelectCustomer, walkInName, onWalkInNameChange }: Props) {
   const total = useCartStore((s) => s.getSubtotal())
-  const [amounts, setAmounts] = useState<Record<PayMethod, number>>({ cash: 0, card: 0, card_to_card: 0, ledger: 0 })
+  const [mode, setMode] = useState<'single' | 'split'>('single')
+  const [method, setMethod] = useState<PayMethod>('cash')
+  const [cashTendered, setCashTendered] = useState('')
+  const [splitAmounts, setSplitAmounts] = useState<Record<PayMethod, number>>({ cash: 0, card: 0, card_to_card: 0, ledger: 0 })
   const [showCustomerSearch, setShowCustomerSearch] = useState(false)
   const [customerQuery, setCustomerQuery] = useState('')
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -50,36 +53,46 @@ export default function PaymentPanel({ onPay, selectedCustomer, onSelectCustomer
     }
   }, [showCustomerSearch, customerQuery])
 
-  const active = useMemo(() => METHODS.filter(m => (amounts[m.key] || 0) > 0), [amounts])
-  const allocated = active.reduce((s, m) => s + (amounts[m.key] || 0), 0)
-  const remaining = Math.max(0, total - allocated)
-  const ledgerAmount = amounts.ledger || 0
+  // ── Single mode ─────────────────────────────────────────────
+  const tendered = parseFormattedNumber(cashTendered)
+  const change = method === 'cash' ? Math.max(0, tendered - total) : 0
+  const cashOk = method === 'cash' ? tendered > 0 : true
+  const ledgerOk = method === 'ledger' ? !!selectedCustomer : true
+  const singleReady = cashOk && ledgerOk
 
-  const setAmount = (m: PayMethod, v: number) => setAmounts(prev => ({ ...prev, [m]: v }))
-  const toggleOff = (m: PayMethod) => setAmounts(prev => ({ ...prev, [m]: 0 }))
-  const fillRemaining = (m: PayMethod) => {
-    if (m === 'ledger' && !selectedCustomer) return
-    const otherAllocated = active.filter(a => a.key !== m).reduce((s, x) => s + (amounts[x.key] || 0), 0)
-    const rem = Math.max(0, total - otherAllocated)
-    setAmounts(prev => ({ ...prev, [m]: rem }))
+  const paySingle = () => {
+    if (!singleReady) return
+    if (method === 'cash') {
+      onPay([{ method: 'cash', amount: total }], tendered)
+    } else {
+      onPay([{ method, amount: total }])
+    }
   }
 
-  const ready = remaining === 0 && allocated > 0 && (ledgerAmount === 0 || !!selectedCustomer)
+  // ── Split mode ──────────────────────────────────────────────
+  const splitActive = useMemo(() => METHOD_KEYS.filter(m => (splitAmounts[m] || 0) > 0), [splitAmounts])
+  const splitAllocated = splitActive.reduce((s, m) => s + (splitAmounts[m] || 0), 0)
+  const splitRemaining = Math.max(0, total - splitAllocated)
+  const splitReady = splitRemaining === 0 && splitAllocated > 0 && (splitAmounts.ledger === 0 || !!selectedCustomer)
 
-  const complete = () => {
-    if (!ready) return
-    const payments = normalizePayments(
-      METHODS.map(m => ({ method: m.key, amount: amounts[m.key] || 0 })),
-      total,
-    )
+  const setSplit = (m: PayMethod, v: number) => setSplitAmounts(prev => ({ ...prev, [m]: v }))
+  const fillSplit = (m: PayMethod) => {
+    if (m === 'ledger' && !selectedCustomer) return
+    const others = splitActive.filter(x => x !== m).reduce((s, x) => s + (splitAmounts[x] || 0), 0)
+    setSplitAmounts(prev => ({ ...prev, [m]: Math.max(0, total - others) }))
+  }
+
+  const paySplit = () => {
+    if (!splitReady) return
+    const payments = normalizePayments(METHOD_KEYS.map(m => ({ method: m, amount: splitAmounts[m] || 0 })), total)
     if (payments.length === 0) return
     onPay(payments)
   }
 
-  const canUseLedger = !!selectedCustomer
+  const needsLedgerCustomer = (splitAmounts.ledger || 0) > 0 && !selectedCustomer
 
   return (
-    <div className="card space-y-2" style={{ overflowY: 'auto', maxHeight: '46vh' }}>
+    <div className="card space-y-2" style={{ overflowY: 'auto', maxHeight: '50vh' }}>
       <div className="text-center">
         <span className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>{fa.pos.total}</span>
         <div className="text-2xl font-bold text-green-400">{total.toLocaleString('fa-IR')} {fa.common.toman}</div>
@@ -101,12 +114,8 @@ export default function PaymentPanel({ onPay, selectedCustomer, onSelectCustomer
             {fa.payment.selectCustomer}
           </button>
         )}
-        {ledgerAmount > 0 && !selectedCustomer && (
-          <p className="text-[10px] mt-1 font-bold" style={{ color: '#f59e0b' }}>برای بخش بدهی باید مشتری انتخاب شود</p>
-        )}
       </div>
 
-      {/* Walk-in buyer: no saved customer, but we still print the name on the invoice */}
       {!selectedCustomer && (
         <div>
           <label className="text-[10px] font-bold block mb-1" style={{ color: 'var(--text-secondary)' }}>نام مشتری (مشتری گذری)</label>
@@ -131,64 +140,100 @@ export default function PaymentPanel({ onPay, selectedCustomer, onSelectCustomer
         </div>
       )}
 
-      {/* Method toggles */}
-      <div className="grid grid-cols-2 gap-1.5">
-        {METHODS.map((m) => {
-          const on = (amounts[m.key] || 0) > 0
-          const color = paymentColor(m.key)
-          const disabled = m.key === 'ledger' && !canUseLedger
-          return (
-            <button key={m.key} onClick={() => {
-              if (on) { toggleOff(m.key); return }
-              // First method → pay the full amount (fast single-method flow);
-              // adding another method → fill whatever is still remaining.
-              if (allocated <= 0) setAmount(m.key, total)
-              else if (remaining > 0) setAmount(m.key, remaining)
-              else setAmount(m.key, 0)
-            }} disabled={disabled}
-              className="rounded-xl py-2 flex flex-col items-center gap-0.5 transition-all"
-              style={{
-                background: on ? color + '22' : 'var(--bg-tertiary)',
-                border: `1.5px solid ${on ? color : 'var(--border-color)'}`,
-                color: on ? color : 'var(--text-secondary)',
-                opacity: disabled ? 0.4 : 1,
-                cursor: disabled ? 'not-allowed' : 'pointer',
-              }}>
-              {m.icon}
-              <span className="text-[9px] font-bold">{paymentMethodLabel(m.key)}</span>
-            </button>
-          )
-        })}
+      {/* Mode toggle: simple vs split */}
+      <div className="flex gap-1 rounded-xl p-0.5" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+        <button onClick={() => setMode('single')} className="flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all"
+          style={{ background: mode === 'single' ? 'linear-gradient(135deg,#006194,#007bb9)' : 'transparent', color: mode === 'single' ? '#fff' : 'var(--text-secondary)' }}>ساده</button>
+        <button onClick={() => setMode('split')} className="flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all"
+          style={{ background: mode === 'split' ? 'linear-gradient(135deg,#7c3aed,#a855f7)' : 'transparent', color: mode === 'split' ? '#fff' : 'var(--text-secondary)' }}>{fa.payment.splitPayment}</button>
       </div>
 
-      {/* Amounts for active methods */}
-      {active.length > 0 && (
-        <div className="space-y-1.5 pt-1">
-          {active.map((m) => {
-            const color = paymentColor(m.key)
+      {mode === 'single' ? (
+        <>
+          {/* Method buttons — one tap to switch (classic behaviour) */}
+          <div className="grid grid-cols-2 gap-1.5">
+            {METHOD_KEYS.map((m) => {
+              const on = method === m
+              const color = paymentColor(m)
+              const disabled = m === 'ledger' && !selectedCustomer
+              return (
+                <button key={m} onClick={() => { if (disabled) return; setMethod(m); setCashTendered('') }} disabled={disabled}
+                  className="rounded-xl py-2 flex flex-col items-center gap-0.5 transition-all"
+                  style={{
+                    background: on ? color + '22' : 'var(--bg-tertiary)',
+                    border: `1.5px solid ${on ? color : 'var(--border-color)'}`,
+                    color: on ? color : 'var(--text-secondary)',
+                    opacity: disabled ? 0.4 : 1,
+                    cursor: disabled ? 'not-allowed' : 'pointer',
+                  }}>
+                  {icons[m]}
+                  <span className="text-[9px] font-bold">{paymentMethodLabel(m)}</span>
+                </button>
+              )
+            })}
+          </div>
+
+          {method === 'cash' && (
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold" style={{ color: paymentColor('cash') }}>{fa.payment.customerPays}</span>
+                <input type="text" inputMode="numeric" value={cashTendered}
+                  onChange={(e) => setCashTendered(formatNumberInput(e.target.value))}
+                  placeholder={total.toLocaleString('fa-IR')} className="input-field text-lg font-bold text-center flex-1" />
+              </div>
+              <div className="flex justify-between items-center px-1">
+                <span className="text-[10px] font-bold" style={{ color: 'var(--text-secondary)' }}>{fa.payment.change}</span>
+                <span className="text-sm font-bold text-yellow-400">{change.toLocaleString('fa-IR')}</span>
+              </div>
+            </div>
+          )}
+
+          {method !== 'cash' && (
+            <div className="rounded-xl p-2 text-center" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+              <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+                {method === 'ledger' ? fa.payment.addToLedger : `${paymentMethodLabel(method)}`}
+              </span>
+              <div className="text-lg font-bold text-green-400 mt-0.5">{total.toLocaleString('fa-IR')} {fa.common.toman}</div>
+            </div>
+          )}
+
+          {method === 'ledger' && !selectedCustomer && (
+            <p className="text-[10px] font-bold" style={{ color: '#f59e0b' }}>برای پرداخت بدهی ابتدا مشتری را انتخاب کنید</p>
+          )}
+
+          <button onClick={paySingle} disabled={!singleReady}
+            className="btn btn-success w-full py-3 text-base disabled:opacity-40">{fa.payment.completeSale}</button>
+        </>
+      ) : (
+        <>
+          {METHOD_KEYS.map((m) => {
+            const color = paymentColor(m)
+            const disabled = m === 'ledger' && !selectedCustomer
             return (
-              <div key={m.key} className="flex items-center gap-1.5">
-                <span className="text-[10px] font-bold w-16 shrink-0" style={{ color }}>{paymentMethodLabel(m.key)}</span>
-                <input type="text" inputMode="numeric" value={amounts[m.key] ? formatNumberInput(String(amounts[m.key])) : ''}
-                  onChange={(e) => setAmount(m.key, parseFormattedNumber(e.target.value))}
-                  placeholder="0" className="input-field text-xs font-bold text-center flex-1 min-w-0" />
-                <button onClick={() => fillRemaining(m.key)} className="px-2 py-1 rounded-lg text-[10px] font-bold shrink-0"
-                  style={{ backgroundColor: color + '1a', color }}>{fa.payment.allocate}</button>
-                <button onClick={() => toggleOff(m.key)} className="shrink-0 text-xs" style={{ color: 'var(--text-muted)' }}>&times;</button>
+              <div key={m} className="flex items-center gap-1.5">
+                <span className="text-[10px] font-bold w-20 shrink-0" style={{ color }}>{paymentMethodLabel(m)}</span>
+                <input type="text" inputMode="numeric" value={splitAmounts[m] ? formatNumberInput(String(splitAmounts[m])) : ''}
+                  onChange={(e) => setSplit(m, parseFormattedNumber(e.target.value))}
+                  placeholder="0" disabled={disabled} className="input-field text-xs font-bold text-center flex-1 min-w-0"
+                  style={{ opacity: disabled ? 0.4 : 1 }} />
+                <button onClick={() => fillSplit(m)} disabled={disabled} className="px-2 py-1 rounded-lg text-[10px] font-bold shrink-0"
+                  style={{ backgroundColor: color + '1a', color, opacity: disabled ? 0.4 : 1 }}>{fa.payment.allocate}</button>
               </div>
             )
           })}
           <div className="flex justify-between items-center pt-1" style={{ borderTop: '1px solid var(--border-color)' }}>
             <span className="text-[10px] font-bold" style={{ color: 'var(--text-secondary)' }}>{fa.payment.remaining}</span>
-            <span className="text-sm font-bold" style={{ color: remaining > 0 ? '#f59e0b' : 'var(--text-primary)' }}>
-              {remaining.toLocaleString('fa-IR')} {fa.common.toman}
+            <span className="text-sm font-bold" style={{ color: splitRemaining > 0 ? '#f59e0b' : 'var(--text-primary)' }}>
+              {splitRemaining.toLocaleString('fa-IR')} {fa.common.toman}
             </span>
           </div>
-        </div>
+          {needsLedgerCustomer && (
+            <p className="text-[10px] font-bold" style={{ color: '#f59e0b' }}>برای بخش بدهی باید مشتری انتخاب شود</p>
+          )}
+          <button onClick={paySplit} disabled={!splitReady}
+            className="btn btn-success w-full py-3 text-base disabled:opacity-40">{fa.payment.completeSale}</button>
+        </>
       )}
-
-      <button onClick={complete} disabled={!ready}
-        className="btn btn-success w-full py-3 text-base disabled:opacity-40">{fa.payment.completeSale}</button>
     </div>
   )
 }

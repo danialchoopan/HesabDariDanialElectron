@@ -102,20 +102,20 @@ export default function SalesTerminal() {
     showNotif(`${product.title} — ${product.sale_price.toLocaleString('fa-IR')} ${fa.common.toman}`)
   }, [addItem, showNotif, lastError, clearError])
 
-  const [pendingPayment, setPendingPayment] = useState<{ payments: SalePayment[]; saleType: 'in-person' | 'online' } | null>(null)
+  const [pendingPayment, setPendingPayment] = useState<{ payments: SalePayment[]; cashTendered?: number; saleType: 'in-person' | 'online' } | null>(null)
   const [saleType, setSaleType] = useState<'in-person' | 'online'>('in-person')
   const [saleDate, setSaleDate] = useState('')
   const [affectsInventory, setAffectsInventory] = useState(true)
   // Shipping cost for online orders
   const [shippingCost, setShippingCost] = useState(0)
 
-  // Called by the split PaymentPanel with the full payment allocation.
-  const handlePay = useCallback(async (payments: SalePayment[]) => {
+  // Called by the PaymentPanel (single or split) with the payment allocation.
+  const handlePay = useCallback(async (payments: SalePayment[], cashTendered?: number) => {
     if (items.length === 0) { showNotif(fa.pos.noItems); return }
     const total = getSubtotal()
     const final = normalizePayments(payments, total)
     if (final.length === 0) { showNotif(fa.pos.noItems); return }
-    setPendingPayment({ payments: final, saleType })
+    setPendingPayment({ payments: final, cashTendered, saleType })
     setInvoiceDesc('')
     setInvoiceNote('')
   }, [items, getSubtotal, showNotif, saleType])
@@ -154,35 +154,44 @@ export default function SalesTerminal() {
     const primary: 'cash' | 'card' | 'ledger' = hasLedger && cashBank === 0 ? 'ledger' : bankOnly ? 'card' : cashOnly ? 'cash' : cashBank >= (total - cashBank) ? 'cash' : 'card'
 
     const customerName = invoiceCustomerName.trim() || selectedCustomer?.name || ''
-    const result = await window.api.sales.create({
-      userId: user!.id,
-      items: items.map((i) => ({ productId: i.productId, productTitle: i.title, quantity: i.quantity, unitPrice: i.unitPrice, purchasePrice: i.purchasePrice })),
-      paymentMethod: primary,
-      payments,
-      customerId: selectedCustomer?.id,
-      customerPaid: cashBank,
-      description: invoiceDesc,
-      invoiceDescription: invoiceNote,
-      manualCustomerName: customerName,
-      saleType: pendingPayment.saleType,
-      saleDate: saleDate || undefined,
-      affectsInventory,
-      shippingCost,
-    })
-    if (result.success && result.data) {
-      const saleData = { ...result.data, customerName }
-      setLastCustomer(selectedCustomer)
-      setSaleComplete(saleData)
-      clearCart()
-      setSelectedCustomer(null)
-      setInvoiceCustomerName('')
+    // For a pure cash payment the cashier may take more than the total and give
+    // change — pass that tendered amount so the sale records customerPaid/change.
+    const customerPaid = pendingPayment.cashTendered ?? cashBank
+    try {
+      const result = await window.api.sales.create({
+        userId: user!.id,
+        items: items.map((i) => ({ productId: i.productId, productTitle: i.title, quantity: i.quantity, unitPrice: i.unitPrice, purchasePrice: i.purchasePrice })),
+        paymentMethod: primary,
+        payments,
+        customerId: selectedCustomer?.id,
+        customerPaid,
+        description: invoiceDesc,
+        invoiceDescription: invoiceNote,
+        manualCustomerName: customerName,
+        saleType: pendingPayment.saleType,
+        saleDate: saleDate || undefined,
+        affectsInventory,
+        shippingCost,
+      })
+      if (result.success && result.data) {
+        const saleData = { ...result.data, customerName }
+        setLastCustomer(selectedCustomer)
+        setSaleComplete(saleData)
+        clearCart()
+        setSelectedCustomer(null)
+        setInvoiceCustomerName('')
+        setSaleDate('')
+        setShippingCost(0) // reset after sale
+        setAffectsInventory(true)
+      } else { showNotif(`${result.error}`) }
+    } catch (err) {
+      showNotif('خطا در ثبت فاکتور')
+      console.error('[POS] Sale create failed:', err)
+    } finally {
+      // ALWAYS close the confirmation dialog so it can never keep the UI blocked.
       setPendingPayment(null)
-      setSaleDate('')
-      setShippingCost(0) // reset after sale
-      setAffectsInventory(true)
       barcodeRef.current?.focus()
-    } else { showNotif(`${result.error}`) }
-    setPendingPayment(null)
+    }
   }, [pendingPayment, items, user, selectedCustomer, lastCustomer, clearCart, showNotif, invoiceCustomerName, invoiceDesc, invoiceNote, getSubtotal])
 
   const handleSuspend = useCallback(async (slotIndex?: number) => {
