@@ -104,6 +104,7 @@ export interface Sale {
   paymentMethod: 'cash' | 'card' | 'ledger'
   customerId?: number
   customerName?: string
+  customerType?: 'real' | 'legal'
   customerPaid: number
   changeAmount: number
   description?: string

@@ -169,7 +169,7 @@ export function createSale(input: SaleInput): Sale {
 export function getSaleById(id: number): Sale | undefined {
   const db = getDatabase()
   const saleRow = db.prepare(
-    'SELECT s.*, u.name as userName, c.name as customerName FROM sales s LEFT JOIN users u ON s.userId = u.id LEFT JOIN customers c ON s.customerId = c.id WHERE s.id = ?'
+    'SELECT s.*, u.name as userName, c.name as customerName, c.customerType as customerType FROM sales s LEFT JOIN users u ON s.userId = u.id LEFT JOIN customers c ON s.customerId = c.id WHERE s.id = ?'
   ).get(id) as Record<string, unknown> | undefined
   if (!saleRow) return undefined
 
@@ -183,6 +183,7 @@ export function getSaleById(id: number): Sale | undefined {
     userName: (saleRow.userName as string) ?? undefined,
     customerId: (saleRow.customerId as number) ?? undefined,
     customerName: (saleRow.customerName as string) ?? (saleRow.manualCustomerName as string) ?? undefined,
+    customerType: (saleRow.customerType as 'real' | 'legal') ?? undefined,
     items: items.map(mapSaleItem),
     subtotal: saleRow.subtotal as number,
     total_amount: saleRow.total_amount as number,
@@ -214,7 +215,7 @@ function loadPayments(db: any, saleId: number): { method: 'cash' | 'card' | 'car
 export function getSalesByDateRange(startDate: string, endDate: string): Sale[] {
   const db = getDatabase()
   const sales = db.prepare(
-    "SELECT s.*, u.name as userName, c.name as customerName FROM sales s LEFT JOIN users u ON s.userId = u.id LEFT JOIN customers c ON s.customerId = c.id WHERE date(s.saleDate) BETWEEN ? AND ? ORDER BY s.saleDate DESC"
+    "SELECT s.*, u.name as userName, c.name as customerName, c.customerType as customerType FROM sales s LEFT JOIN users u ON s.userId = u.id LEFT JOIN customers c ON s.customerId = c.id WHERE date(s.saleDate) BETWEEN ? AND ? ORDER BY s.saleDate DESC"
   ).all(startDate, endDate) as Record<string, unknown>[]
 
   // Batch-load payment splits so we avoid an N+1 query per sale.
@@ -241,6 +242,7 @@ export function getSalesByDateRange(startDate: string, endDate: string): Sale[] 
       userName: (saleRow.userName as string) ?? undefined,
       customerId: (saleRow.customerId as number) ?? undefined,
       customerName: (saleRow.customerName as string) ?? (saleRow.manualCustomerName as string) ?? undefined,
+    customerType: (saleRow.customerType as 'real' | 'legal') ?? undefined,
       items: items.map(mapSaleItem),
       subtotal: saleRow.subtotal as number,
       total_amount: saleRow.total_amount as number,

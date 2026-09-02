@@ -79,6 +79,11 @@ export default function PrintPreviewDialog() {
 
   const getPreviewHTML = () => {
     const signatureHtml = pending.isInvoice ? `
+      <div style="margin-top:12px;font-size:9pt"><strong>خریدار:</strong> ${pending.customerName || '…'}</div>
+      <div style="display:flex;gap:16px;margin:4px 0;font-size:9pt">
+        <label><input type="checkbox" ${pending.customerType === 'real' ? 'checked' : ''}/> حقیقی</label>
+        <label><input type="checkbox" ${pending.customerType === 'legal' ? 'checked' : ''}/> حقوقی</label>
+      </div>
       <div style="display:flex;justify-content:space-between;margin-top:24px;padding-top:12px;border-top:1px solid #ccc;font-size:8pt">
         <div style="width:45%;text-align:center"><div style="border-top:1px solid #333;margin-top:24px;padding-top:4px">محل امضای خریدار</div></div>
         <div style="width:45%;text-align:center"><div style="border-top:1px solid #333;margin-top:24px;padding-top:4px">محل امضای فروشنده</div></div>
@@ -105,7 +110,14 @@ export default function PrintPreviewDialog() {
     }
 
     const printName = templateShopNames[activeTemplate] || shopName
-    await printA4Report(pending.html, pending.title, { isInvoice: pending.isInvoice, shopName: printName, customization: custom, qrData: pending.qrData })
+    await printA4Report(pending.html, pending.title, {
+      isInvoice: pending.isInvoice,
+      shopName: printName,
+      customization: custom,
+      qrData: pending.qrData,
+      customerName: pending.customerName,
+      customerType: pending.customerType,
+    })
     setLoading(false)
     pending.onClose?.()
     clear()

@@ -51,6 +51,8 @@ export async function printA4Report(html: string, title: string, options?: {
   taxRate?: number
   customization?: Record<string, string>
   qrData?: string
+  customerName?: string
+  customerType?: 'real' | 'legal'
 }): Promise<void> {
   const cust = { ...cachedCustomization, ...(options?.customization || {}) }
 
@@ -90,10 +92,16 @@ export async function printA4Report(html: string, title: string, options?: {
     ? "'Vazirmatn', Tahoma, 'Segoe UI', sans-serif"
     : `${fontFamily}, 'Vazirmatn', Tahoma, sans-serif`
 
+  // The selected customer's name goes on the invoice and the real/legal
+  // (حقیقی/حقوقی) checkbox is pre-ticked to match their customer type.
+  const buyerReal = options?.customerType === 'real'
+  const buyerLegal = options?.customerType === 'legal'
+
   const invoiceSection = isInvoice && showSignature ? `
+    ${options?.customerName ? `<div style="font-size: 11pt; margin: 10px 0 2px 0;"><strong>خریدار:</strong> ${options.customerName}</div>` : ''}
     <div class="checkbox-group">
-      <label><input type="checkbox" /> حقیقی</label>
-      <label><input type="checkbox" /> حقوقی</label>
+      <label><input type="checkbox" ${buyerReal ? 'checked' : ''} /> حقیقی</label>
+      <label><input type="checkbox" ${buyerLegal ? 'checked' : ''} /> حقوقی</label>
     </div>
     <div>
       <strong style="font-size: 10pt;">توضیحات:</strong>

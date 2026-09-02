@@ -497,7 +497,7 @@ export default function SalesHistory() {
                 html += '</tbody></table>'
                 html += `<p><strong>جمع کل: ${selectedSale.total_amount.toLocaleString('fa-IR')} تومان</strong></p>`
                 html += `<div style="margin-top:16px;padding-top:8px;border-top:1px solid #ccc;text-align:left;font-size:8pt;color:#999">چاپ مجدد — ${new Date().toLocaleString('fa-IR')}</div>`
-                showPrint(html, selectedSale.paymentMethod === 'ledger' ? 'صورتحساب بدهی' : 'فاکتور فروش', true, selectedSale.invoiceNumber)
+                showPrint(html, selectedSale.paymentMethod === 'ledger' ? 'صورتحساب بدهی' : 'فاکتور فروش', true, selectedSale.invoiceNumber, undefined, { name: selectedSale.customerName, type: selectedSale.customerType })
               }}
                 className="text-sm px-5 py-2.5 rounded-xl font-bold flex-1 transition-all duration-200"
                 style={{ background: 'linear-gradient(135deg, #006194, #007bb9)', color: '#fff', boxShadow: '0 2px 8px rgba(0,97,148,0.3)' }}>چاپ فاکتور</button>
