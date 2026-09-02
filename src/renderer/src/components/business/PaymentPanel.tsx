@@ -53,6 +53,19 @@ export default function PaymentPanel({ onPay, selectedCustomer, onSelectCustomer
     }
   }, [showCustomerSearch, customerQuery])
 
+  // Cash defaults to the FULL amount (assume the customer paid exactly), but
+  // the cashier can edit it if they need to enter a different tendered amount
+  // (e.g. to show change). Keep whatever the cashier typed once they change it.
+  useEffect(() => {
+    if (method !== 'cash') { setCashTendered(''); return }
+    if (total <= 0) { setCashTendered(''); return }
+    setCashTendered(prev => {
+      const cur = parseFormattedNumber(prev)
+      if (cur <= 0) return formatNumberInput(String(total))
+      return prev
+    })
+  }, [method, total])
+
   // ── Single mode ─────────────────────────────────────────────
   const tendered = parseFormattedNumber(cashTendered)
   const change = method === 'cash' ? Math.max(0, tendered - total) : 0
