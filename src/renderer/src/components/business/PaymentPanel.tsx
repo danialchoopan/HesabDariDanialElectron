@@ -25,6 +25,9 @@ interface Props {
   onPay: (payments: SalePayment[]) => void
   selectedCustomer: Customer | null
   onSelectCustomer: (c: Customer | null) => void
+  /** Walk-in (manual) buyer name to print on the invoice — editable here. */
+  walkInName?: string
+  onWalkInNameChange?: (name: string) => void
 }
 
 const METHODS: { key: PayMethod; icon: JSX.Element }[] = [
@@ -34,7 +37,7 @@ const METHODS: { key: PayMethod; icon: JSX.Element }[] = [
   { key: 'ledger', icon: <BookIcon className="w-5 h-5" /> },
 ]
 
-export default function PaymentPanel({ onPay, selectedCustomer, onSelectCustomer }: Props) {
+export default function PaymentPanel({ onPay, selectedCustomer, onSelectCustomer, walkInName, onWalkInNameChange }: Props) {
   const total = useCartStore((s) => s.getSubtotal())
   const [amounts, setAmounts] = useState<Record<PayMethod, number>>({ cash: 0, card: 0, card_to_card: 0, ledger: 0 })
   const [showCustomerSearch, setShowCustomerSearch] = useState(false)
@@ -102,6 +105,15 @@ export default function PaymentPanel({ onPay, selectedCustomer, onSelectCustomer
           <p className="text-[10px] mt-1 font-bold" style={{ color: '#f59e0b' }}>برای بخش بدهی باید مشتری انتخاب شود</p>
         )}
       </div>
+
+      {/* Walk-in buyer: no saved customer, but we still print the name on the invoice */}
+      {!selectedCustomer && (
+        <div>
+          <label className="text-[10px] font-bold block mb-1" style={{ color: 'var(--text-secondary)' }}>نام مشتری (مشتری گذری)</label>
+          <input value={walkInName || ''} onChange={(e) => onWalkInNameChange?.(e.target.value)}
+            placeholder="درج نام روی فاکتور — اختیاری" className="input-field text-xs w-full" maxLength={80} />
+        </div>
+      )}
 
       {showCustomerSearch && (
         <div className="rounded-xl p-2" style={{ backgroundColor: 'var(--bg-tertiary)' }}>

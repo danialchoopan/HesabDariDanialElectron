@@ -101,26 +101,34 @@ export default function PrintPreviewDialog() {
 
   const handlePrint = async () => {
     setLoading(true)
-    const allData = customSettings
-    const custom: Record<string, string> = allData[activeTemplate] || {}
-    if (activeTemplate !== 'default' && !allData[activeTemplate]) {
-      custom.printColorScheme = color
-      if (t.border !== 'none') custom.printBorderStyle = t.border
-      if (t.align !== 'center') custom.printHeaderAlign = t.align
-    }
+    try {
+      const allData = customSettings
+      const custom: Record<string, string> = allData[activeTemplate] || {}
+      if (activeTemplate !== 'default' && !allData[activeTemplate]) {
+        custom.printColorScheme = color
+        if (t.border !== 'none') custom.printBorderStyle = t.border
+        if (t.align !== 'center') custom.printHeaderAlign = t.align
+      }
 
-    const printName = templateShopNames[activeTemplate] || shopName
-    await printA4Report(pending.html, pending.title, {
-      isInvoice: pending.isInvoice,
-      shopName: printName,
-      customization: custom,
-      qrData: pending.qrData,
-      customerName: pending.customerName,
-      customerType: pending.customerType,
-    })
-    setLoading(false)
-    pending.onClose?.()
-    clear()
+      const printName = templateShopNames[activeTemplate] || shopName
+      await printA4Report(pending.html, pending.title, {
+        isInvoice: pending.isInvoice,
+        shopName: printName,
+        customization: custom,
+        qrData: pending.qrData,
+        customerName: pending.customerName,
+        customerType: pending.customerType,
+      })
+    } catch (err) {
+      console.error('[PrintPreview] Print failed:', err)
+      alert('خطا در چاپ — دوباره تلاش کنید')
+    } finally {
+      // ALWAYS dismiss the preview so its full-screen overlay can never stay
+      // up and block the whole UI after a print attempt.
+      setLoading(false)
+      pending.onClose?.()
+      clear()
+    }
   }
 
   const handleClose = () => { pending.onClose?.(); clear() }

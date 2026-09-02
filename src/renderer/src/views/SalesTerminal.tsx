@@ -116,10 +116,9 @@ export default function SalesTerminal() {
     const final = normalizePayments(payments, total)
     if (final.length === 0) { showNotif(fa.pos.noItems); return }
     setPendingPayment({ payments: final, saleType })
-    setInvoiceCustomerName(selectedCustomer?.name || '')
     setInvoiceDesc('')
     setInvoiceNote('')
-  }, [items, getSubtotal, showNotif, selectedCustomer, saleType])
+  }, [items, getSubtotal, showNotif, saleType])
 
   // Quick full-payment via keyboard shortcuts (single method).
   const quickPay = useCallback((method: 'cash' | 'card' | 'ledger') => {
@@ -176,6 +175,7 @@ export default function SalesTerminal() {
       setSaleComplete(saleData)
       clearCart()
       setSelectedCustomer(null)
+      setInvoiceCustomerName('')
       setPendingPayment(null)
       setSaleDate('')
       setShippingCost(0) // reset after sale
@@ -432,7 +432,13 @@ export default function SalesTerminal() {
         <PaymentPanel
           onPay={handlePay}
           selectedCustomer={selectedCustomer}
-          onSelectCustomer={setSelectedCustomer}
+          onSelectCustomer={(c) => {
+            setSelectedCustomer(c)
+            // A picked customer's name is used on the invoice automatically
+            if (c) setInvoiceCustomerName(c.name)
+          }}
+          walkInName={invoiceCustomerName}
+          onWalkInNameChange={setInvoiceCustomerName}
         />
 
         {/* Suspended Slots Grid */}
