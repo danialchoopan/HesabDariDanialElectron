@@ -4,6 +4,7 @@ import { fa } from '../../i18n'
 import { formatJalaliDateTime } from '../../utils/jalali'
 import { generateReceiptHTML, printContent } from '../../utils/receipt'
 import { useTheme } from '../../hooks/useTheme'
+import { formatSalePayments } from '../../utils/payment'
 
 interface Props {
   sale: Sale
@@ -18,7 +19,9 @@ export default function ReceiptPrinter({ sale, storeName, storeAddress, storePho
   const { isDark } = useTheme()
   const [ps, setPs] = useState<Record<string, string>>({})
   const [logo, setLogo] = useState('')
-  const methodLabel = sale.paymentMethod === 'cash' ? fa.payment.cash : sale.paymentMethod === 'card' ? fa.payment.card : fa.payment.ledger
+  // For split payments show the full breakdown (e.g. نقدی ۴۰٬۰۰۰ + بدهی ۶۰٬۰۰۰);
+  // for a single method this collapses to just the label.
+  const methodText = formatSalePayments(sale)
 
   useEffect(() => {
     let cancelled = false
@@ -40,7 +43,7 @@ export default function ReceiptPrinter({ sale, storeName, storeAddress, storePho
     date: formatJalaliDateTime(sale.createdAt),
     cashier: sale.userName,
     customer: sale.customerName,
-    method: methodLabel,
+    method: methodText,
     items: (sale.items || []).map((item: any) => ({
       name: item.productTitle,
       qty: item.quantity,

@@ -19,6 +19,8 @@ import { fa } from '../i18n'
 import { formatJalaliDateTime, gregorianToJalali, formatPriceFA, formatPriceFull } from '../utils/jalali'
 import { generateReceiptHTML, printContent } from '../utils/receipt'
 import { printA4Report, downloadExcel } from '../utils/a4Print'
+import { paymentChannels, formatSalePayments } from '../utils/payment'
+import SalePaymentBadge from '../components/business/SalePaymentBadge'
 import ShamsiDateInput from '../components/business/ShamsiDateInput'
 import Pagination from '../components/ui/Pagination'
 import { useSortable } from '../hooks/useSortable'
@@ -87,9 +89,15 @@ export default function Dashboard() {
   useEffect(() => { loadData() }, [startDate, endDate])
 
   const totalSales = sales.reduce((a: number, s: any) => a + s.total_amount, 0)
-  const cashTotal = sales.filter((s: any) => s.paymentMethod === 'cash').reduce((a: number, s: any) => a + s.total_amount, 0)
-  const cardTotal = sales.filter((s: any) => s.paymentMethod === 'card').reduce((a: number, s: any) => a + s.total_amount, 0)
-  const ledgerTotal = sales.filter((s: any) => s.paymentMethod === 'ledger').reduce((a: number, s: any) => a + s.total_amount, 0)
+  // Split payments: total each channel across the sale's actual payment rows
+  const channels = sales.reduce((acc: any, s: any) => {
+    const c = paymentChannels(s)
+    acc.cash += c.cash; acc.bank += c.bank; acc.ledger += c.ledger
+    return acc
+  }, { cash: 0, bank: 0, ledger: 0 })
+  const cashTotal = channels.cash
+  const cardTotal = channels.bank
+  const ledgerTotal = channels.ledger
   const pagedSales = sales.slice(salesPage * salesPageSize, (salesPage + 1) * salesPageSize)
   const { sorted: sortedSales, sortKey, sortDir, toggleSort } = useSortable(pagedSales)
   const [showPrintDialog, setShowPrintDialog] = useState(false)
@@ -447,19 +455,7 @@ export default function Dashboard() {
                 <td className="px-5 py-2.5 font-mono text-xs font-bold" style={{ color: primary }}>{s.invoiceNumber}</td>
                 <td className="px-5 py-2.5 font-bold" style={{ color: textPrimary }}>{s.userName}</td>
                 <td className="px-5 py-2.5 text-center">
-                  <span
-                    className="px-2.5 py-1 rounded-full text-[11px] font-bold inline-block"
-                    style={{
-                      backgroundColor: s.paymentMethod === 'cash'
-                        ? (isDark ? 'rgba(34,197,94,0.15)' : '#dcfce7')
-                        : s.paymentMethod === 'card'
-                        ? (isDark ? 'rgba(59,130,246,0.15)' : '#dbeafe')
-                        : (isDark ? 'rgba(168,85,247,0.15)' : '#f3e8ff'),
-                      color: s.paymentMethod === 'cash' ? '#22c55e' : s.paymentMethod === 'card' ? '#3b82f6' : '#a855f7',
-                    }}
-                  >
-                    {s.paymentMethod === 'cash' ? fa.payment.cash : s.paymentMethod === 'card' ? fa.payment.card : fa.payment.ledger}
-                  </span>
+                  <SalePaymentBadge sale={s} />
                 </td>
                 <td className="px-5 py-2.5 font-extrabold" style={{ color: textPrimary }}>{s.total_amount.toLocaleString('fa-IR')}</td>
                 <td className="px-5 py-2.5 text-xs" style={{ color: textSecondary }}>{formatJalaliDateTime(s.createdAt)}</td>
@@ -557,7 +553,7 @@ export default function Dashboard() {
                     invoiceNumber: selectedSale.invoiceNumber,
                     date: formatJalaliDateTime(selectedSale.createdAt),
                     cashier: selectedSale.userName,
-                    method: selectedSale.paymentMethod === 'cash' ? fa.payment.cash : selectedSale.paymentMethod === 'card' ? fa.payment.card : fa.payment.ledger,
+                    method: formatSalePayments(selectedSale),
                     items: (selectedSale.items || []).map((item: any) => ({ name: item.productTitle, qty: item.quantity, price: item.unitPrice, total: item.subtotal })),
                     subtotal: selectedSale.subtotal, total: selectedSale.total_amount,
                     footer: 'فروشگاه',

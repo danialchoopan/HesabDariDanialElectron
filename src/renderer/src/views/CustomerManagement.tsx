@@ -23,6 +23,7 @@ import { fa } from '../i18n'
 import { formatJalaliShort, formatJalaliDateTime } from '../utils/jalali'
 import { getProductImageUrl } from '../utils/productImage'
 import { showPrint } from '../utils/showPrint'
+import SalePaymentBadge from '../components/business/SalePaymentBadge'
 import { useHighlight } from '../hooks/useHighlight'
 import CustomerCreditView from './CustomerCreditView'
 import InstallmentsView from './InstallmentsView'
@@ -310,12 +311,6 @@ export default function CustomerManagement({ highlightId, onHighlightDone }: Pro
   const openCreateDialog = () => {
     setForm({ name: '', phone: '', address: '', notes: '', customerType: 'real', description: '', imageBase64: '' })
     setDialog('create')
-  }
-
-  const paymentLabel = (m: string) => {
-    if (m === 'cash') return fa.payment.cash
-    if (m === 'card') return fa.payment.card
-    return fa.payment.ledger
   }
 
   const handlePrintStatement = async () => {
@@ -663,9 +658,7 @@ export default function CustomerManagement({ highlightId, onHighlightDone }: Pro
                                 <div className="text-sm font-bold" style={{ color: PRIMARY }}>{s.invoiceNumber}</div>
                               </div>
                               <div className="flex items-center gap-4">
-                                <div className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: s.paymentMethod === 'cash' ? `${SUCCESS}15` : s.paymentMethod === 'card' ? `${PRIMARY}15` : '#f59e0b15', color: s.paymentMethod === 'cash' ? SUCCESS : s.paymentMethod === 'card' ? PRIMARY : '#d97706' }}>
-                                  {paymentLabel(s.paymentMethod)}
-                                </div>
+                                <SalePaymentBadge sale={s} />
                                 <div className="text-sm font-bold" style={{ color: textPrimary }}>{s.total_amount.toLocaleString('fa-IR')}</div>
                                 <svg className="w-4 h-4 transition-transform" style={{ transform: expandedPurchase === s.id ? 'rotate(180deg)' : 'rotate(0deg)', color: textSecondary }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
                               </div>

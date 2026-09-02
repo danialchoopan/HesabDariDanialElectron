@@ -4,6 +4,8 @@ import { fa } from '../i18n'
 import { formatJalaliDateTime } from '../utils/jalali'
 import { downloadExcel } from '../utils/a4Print'
 import { showPrint } from '../utils/showPrint'
+import { formatSalePayments } from '../utils/payment'
+import SalePaymentBadge from '../components/business/SalePaymentBadge'
 import ShamsiDateInput from '../components/business/ShamsiDateInput'
 import Pagination from '../components/ui/Pagination'
 import { useAuthStore } from '../store/authStore'
@@ -153,7 +155,7 @@ export default function SalesHistory() {
       userName: { header: 'صندوقدار', cell: s => s.userName },
       customerName: { header: 'مشتری', cell: s => s.customerName || '-' },
       items: { header: 'تعداد اقلام', cell: s => String(s.items?.length || 0) },
-      paymentMethod: { header: 'نوع پرداخت', cell: s => s.paymentMethod === 'cash' ? 'نقدی' : s.paymentMethod === 'card' ? 'کارتی' : 'بدهی' },
+      paymentMethod: { header: 'نوع پرداخت', cell: s => formatSalePayments(s) },
       total_amount: { header: 'مبلغ', cell: s => s.total_amount.toLocaleString('fa-IR') },
     }
     let html = '<h1>گزارش فروش</h1>'
@@ -175,7 +177,7 @@ export default function SalesHistory() {
 
   const handleExcelSales = () => {
     const headers = ['فاکتور', 'تاریخ', 'صندوق دار', 'مشتری', 'تعداد اقلام', 'نوع پرداخت', 'نوع فروش', 'مبلغ']
-    const csvRows = filteredSales.map(s => [s.invoiceNumber, formatJalaliDateTime(s.createdAt), s.userName, s.customerName || '-', s.items?.length || 0, s.paymentMethod === 'cash' ? 'نقدی' : s.paymentMethod === 'card' ? 'کارتی' : 'بدهی', s.saleType === 'online' ? 'آنلاین' : 'حضوری', s.total_amount])
+    const csvRows = filteredSales.map(s => [s.invoiceNumber, formatJalaliDateTime(s.createdAt), s.userName, s.customerName || '-', s.items?.length || 0, formatSalePayments(s), s.saleType === 'online' ? 'آنلاین' : 'حضوری', s.total_amount])
     downloadExcel('sales-history.csv', headers, csvRows)
   }
 
@@ -345,10 +347,7 @@ export default function SalesHistory() {
                   <td className="px-5 py-2.5 text-xs" style={{ color: textSecondary }}>{formatJalaliDateTime(s.createdAt)}</td>
                   <td className="px-4 py-2.5 text-center font-bold" style={{ color: textPrimary }}>{s.items.length}</td>
                   <td className="px-4 py-2.5 text-center">
-                    <span className="px-2 py-0.5 rounded-full text-[11px] font-bold inline-block" style={{
-                      backgroundColor: s.paymentMethod === 'cash' ? (isDark ? 'rgba(34,197,94,0.15)' : '#dcfce7') : s.paymentMethod === 'card' ? (isDark ? 'rgba(59,130,246,0.15)' : '#dbeafe') : (isDark ? 'rgba(168,85,247,0.15)' : '#f3e8ff'),
-                      color: s.paymentMethod === 'cash' ? '#22c55e' : s.paymentMethod === 'card' ? '#3b82f6' : '#a855f7',
-                    }}>{s.paymentMethod === 'cash' ? fa.payment.cash : s.paymentMethod === 'card' ? fa.payment.card : fa.payment.ledger}</span>
+                    <SalePaymentBadge sale={s} />
                   </td>
                   <td className="px-4 py-2.5 text-center">
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold" style={{
@@ -411,7 +410,7 @@ export default function SalesHistory() {
               </div>
               <div className="rounded-xl p-3" style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#f8fafc' }}>
                 <div className="text-xs mb-1" style={{ color: textSecondary }}>{fa.payment.method}</div>
-                <div className="text-sm font-bold" style={{ color: textPrimary }}>{selectedSale.paymentMethod === 'cash' ? fa.payment.cash : selectedSale.paymentMethod === 'card' ? fa.payment.card : fa.payment.ledger}</div>
+                <div className="text-sm font-bold" style={{ color: textPrimary }}>{formatSalePayments(selectedSale)}</div>
               </div>
               <div className="rounded-xl p-3" style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#f8fafc' }}>
                 <div className="text-xs mb-1" style={{ color: textSecondary }}>{fa.receipt.date}</div>
@@ -492,7 +491,7 @@ export default function SalesHistory() {
                 const customerInfo = selectedSale.customerName ? `<div class="header-info"><span>مشتری: ${selectedSale.customerName}</span></div>` : ''
                 html += customerInfo
                 html += `<div class="header-info"><span>شماره فاکتور: ${selectedSale.invoiceNumber}</span><span>تاریخ: ${formatJalaliDateTime(selectedSale.createdAt)}</span></div>`
-                html += `<div class="header-info"><span>صندوق دار: ${selectedSale.userName}</span><span>نوع پرداخت: ${selectedSale.paymentMethod === 'cash' ? 'نقدی' : selectedSale.paymentMethod === 'card' ? 'کارتی' : 'بدهی'}</span><span>نوع فروش: ${selectedSale.saleType === 'online' ? 'آنلاین' : 'حضوری'}</span></div>`
+                html += `<div class="header-info"><span>صندوق دار: ${selectedSale.userName}</span><span>نوع پرداخت: ${formatSalePayments(selectedSale)}</span><span>نوع فروش: ${selectedSale.saleType === 'online' ? 'آنلاین' : 'حضوری'}</span></div>`
                 html += '<table><thead><tr><th>کالا</th><th>تعداد</th><th>قیمت واحد</th><th>جمع</th></tr></thead><tbody>'
                 selectedSale.items?.forEach((item: any) => { html += `<tr><td>${item.productTitle}</td><td>${item.quantity}</td><td>${item.unitPrice.toLocaleString('fa-IR')}</td><td>${item.subtotal.toLocaleString('fa-IR')}</td></tr>` })
                 html += '</tbody></table>'

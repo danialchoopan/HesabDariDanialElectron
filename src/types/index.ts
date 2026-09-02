@@ -77,6 +77,21 @@ export interface SaleItem {
   netProfit: number
 }
 
+/**
+ * A single method used to pay an invoice. A sale can be settled with a
+ * combination of these (e.g. cash + card-to-card + debt).
+ *   cash         → cash drawer (account 1100)
+ *   card         → bank terminal / POS card reader (account 1200)
+ *   card_to_card → bank-to-bank transfer (account 1200)
+ *   ledger       → added to the customer's debt (A/R, account 1400)
+ */
+export type PaymentMethod = 'cash' | 'card' | 'card_to_card' | 'ledger'
+
+export interface SalePayment {
+  method: PaymentMethod
+  amount: number
+}
+
 export interface Sale {
   id: number
   invoiceNumber: string
@@ -98,6 +113,7 @@ export interface Sale {
   saleDate: string
   affectsInventory: boolean
   shippingCost?: number
+  payments?: SalePayment[]
   createdAt: string
 }
 
@@ -111,6 +127,13 @@ export interface SaleInput {
     purchasePrice: number
   }[]
   paymentMethod: 'cash' | 'card' | 'ledger'
+  /**
+   * Optional split-payment breakdown. When provided, the sale is settled by
+   * these methods (amounts must sum to the invoice total); sales.paymentMethod
+   * is then derived from the dominant channel. When omitted, a single-method
+   * sale is recorded exactly as before.
+   */
+  payments?: SalePayment[]
   customerId?: number
   customerPaid: number
   description?: string

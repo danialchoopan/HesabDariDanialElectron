@@ -340,6 +340,19 @@ function initializeDatabase(db: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_sale_items_saleId ON sale_items(saleId);
 
+    -- Split/mixed payments for a single sale (e.g. cash + card-to-card + debt).
+    -- sales.paymentMethod keeps the PRIMARY channel for backwards compatibility;
+    -- the full breakdown lives here. One row per method used on the sale.
+    CREATE TABLE IF NOT EXISTS sale_payments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      saleId INTEGER NOT NULL,
+      method TEXT NOT NULL CHECK(method IN ('cash', 'card', 'card_to_card', 'ledger')),
+      amount REAL NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      FOREIGN KEY (saleId) REFERENCES sales(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_sale_payments_saleId ON sale_payments(saleId);
+
     CREATE TABLE IF NOT EXISTS customer_ledger (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       customerId INTEGER NOT NULL,

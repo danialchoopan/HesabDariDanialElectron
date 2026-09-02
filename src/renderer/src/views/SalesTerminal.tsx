@@ -39,7 +39,8 @@ import { CameraIcon } from '../components/ui/Icons'
 import PopularItems from '../components/business/PopularItems'
 import { formatJalaliDateTime, getTodayGregorian } from '../utils/jalali'
 import ShamsiDateInput from '../components/business/ShamsiDateInput'
-import type { Sale, Customer, Product } from "../../../types"
+import type { Sale, Customer, Product, SalePayment } from "../../../types"
+import { formatSalePayments, formatPaymentList, normalizePayments } from '../utils/payment'
 import Dialog, { DialogField, DialogInput, DialogTextarea, DialogButton } from '../components/ui/Dialog'
 import FormattedPriceInput from '../components/ui/FormattedPriceInput'
 
@@ -62,7 +63,6 @@ export default function SalesTerminal() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [lastCustomer, setLastCustomer] = useState<Customer | null>(null)
   const [storeSettings, setStoreSettings] = useState({ storeName: '', storeAddress: '', storePhone: '', receiptFooter: '' })
-  const [fullyPaid, setFullyPaid] = useState(true)
   const [productRefreshKey, setProductRefreshKey] = useState(0)
   const barcodeRef = useRef<HTMLInputElement>(null)
   const [invoiceDesc, setInvoiceDesc] = useState('')
@@ -102,26 +102,38 @@ export default function SalesTerminal() {
     showNotif(`${product.title} — ${product.sale_price.toLocaleString('fa-IR')} ${fa.common.toman}`)
   }, [addItem, showNotif, lastError, clearError])
 
-  const [pendingPayment, setPendingPayment] = useState<{ method: 'cash' | 'card' | 'ledger'; customerPaid?: number; saleType: 'in-person' | 'online' } | null>(null)
+  const [pendingPayment, setPendingPayment] = useState<{ payments: SalePayment[]; saleType: 'in-person' | 'online' } | null>(null)
   const [saleType, setSaleType] = useState<'in-person' | 'online'>('in-person')
   const [saleDate, setSaleDate] = useState('')
   const [affectsInventory, setAffectsInventory] = useState(true)
   // Shipping cost for online orders
   const [shippingCost, setShippingCost] = useState(0)
 
-  const handlePaymentComplete = useCallback(async (method: 'cash' | 'card' | 'ledger', customerPaid?: number) => {
+  // Called by the split PaymentPanel with the full payment allocation.
+  const handlePay = useCallback(async (payments: SalePayment[]) => {
     if (items.length === 0) { showNotif(fa.pos.noItems); return }
     const total = getSubtotal()
-    const paidAmt = fullyPaid ? total : (customerPaid || 0)
-    setPendingPayment({ method, customerPaid: paidAmt, saleType })
+    const final = normalizePayments(payments, total)
+    if (final.length === 0) { showNotif(fa.pos.noItems); return }
+    setPendingPayment({ payments: final, saleType })
     setInvoiceCustomerName(selectedCustomer?.name || '')
     setInvoiceDesc('')
     setInvoiceNote('')
-  }, [items, fullyPaid, getSubtotal, showNotif, selectedCustomer, saleType])
+  }, [items, getSubtotal, showNotif, selectedCustomer, saleType])
+
+  // Quick full-payment via keyboard shortcuts (single method).
+  const quickPay = useCallback((method: 'cash' | 'card' | 'ledger') => {
+    if (items.length === 0) { showNotif(fa.pos.noItems); return }
+    if (method === 'ledger' && !selectedCustomer) { showNotif(fa.payment.selectCustomer); return }
+    const total = getSubtotal()
+    const single: SalePayment = { method: method === 'ledger' ? 'ledger' : method === 'card' ? 'card' : 'cash', amount: total }
+    handlePay([single])
+  }, [items, getSubtotal, showNotif, selectedCustomer, handlePay])
 
   const confirmSale = useCallback(async () => {
     if (!pendingPayment || items.length === 0) return
-    const { method, customerPaid: paidAmt } = pendingPayment
+    const { payments } = pendingPayment
+    const total = getSubtotal()
 
     for (const item of items) {
       const currentProduct = await window.api.products.getById(item.productId)
@@ -135,20 +147,27 @@ export default function SalesTerminal() {
       }
     }
 
+    // Primary channel for sales.paymentMethod (backwards compatible summary).
+    const cashBank = payments.filter(p => p.method !== 'ledger').reduce((s, p) => s + p.amount, 0)
+    const hasLedger = payments.some(p => p.method === 'ledger')
+    const cashOnly = payments.every(p => p.method === 'cash')
+    const bankOnly = payments.every(p => p.method === 'card' || p.method === 'card_to_card')
+    const primary: 'cash' | 'card' | 'ledger' = hasLedger && cashBank === 0 ? 'ledger' : bankOnly ? 'card' : cashOnly ? 'cash' : cashBank >= (total - cashBank) ? 'cash' : 'card'
+
     const customerName = invoiceCustomerName.trim() || selectedCustomer?.name || ''
     const result = await window.api.sales.create({
       userId: user!.id,
       items: items.map((i) => ({ productId: i.productId, productTitle: i.title, quantity: i.quantity, unitPrice: i.unitPrice, purchasePrice: i.purchasePrice })),
-      paymentMethod: method,
+      paymentMethod: primary,
+      payments,
       customerId: selectedCustomer?.id,
-      customerPaid: paidAmt || 0,
+      customerPaid: cashBank,
       description: invoiceDesc,
       invoiceDescription: invoiceNote,
       manualCustomerName: customerName,
       saleType: pendingPayment.saleType,
       saleDate: saleDate || undefined,
       affectsInventory,
-      // Pass shipping cost to sale record
       shippingCost,
     })
     if (result.success && result.data) {
@@ -157,7 +176,6 @@ export default function SalesTerminal() {
       setSaleComplete(saleData)
       clearCart()
       setSelectedCustomer(null)
-      setFullyPaid(true)
       setPendingPayment(null)
       setSaleDate('')
       setShippingCost(0) // reset after sale
@@ -165,7 +183,7 @@ export default function SalesTerminal() {
       barcodeRef.current?.focus()
     } else { showNotif(`${result.error}`) }
     setPendingPayment(null)
-  }, [pendingPayment, items, user, selectedCustomer, lastCustomer, clearCart, showNotif, invoiceCustomerName, invoiceDesc, invoiceNote])
+  }, [pendingPayment, items, user, selectedCustomer, lastCustomer, clearCart, showNotif, invoiceCustomerName, invoiceDesc, invoiceNote, getSubtotal])
 
   const handleSuspend = useCallback(async (slotIndex?: number) => {
     if (items.length === 0) { showNotif(fa.pos.nothingToHold); return }
@@ -197,13 +215,13 @@ export default function SalesTerminal() {
       if (action === 'pos:resume1') handleResume(0)
       if (action === 'pos:resume2') handleResume(1)
       if (action === 'pos:resume3') handleResume(2)
-      if (action === 'pos:payCash') handlePaymentComplete('cash')
-      if (action === 'pos:payCard') handlePaymentComplete('card')
-      if (action === 'pos:payLedger') handlePaymentComplete('ledger')
+      if (action === 'pos:payCash') quickPay('cash')
+      if (action === 'pos:payCard') quickPay('card')
+      if (action === 'pos:payLedger') quickPay('ledger')
     }
     window.addEventListener('pos-shortcut', handler)
     return () => window.removeEventListener('pos-shortcut', handler)
-  }, [handleSuspend, handleResume, handlePaymentComplete])
+  }, [handleSuspend, handleResume, quickPay])
 
   const activeCount = slots.filter((s) => s.items.length > 0).length
 
@@ -216,7 +234,7 @@ export default function SalesTerminal() {
       {/* Payment Confirmation Dialog */}
       <Dialog open={!!pendingPayment} onClose={() => setPendingPayment(null)}
         title="تکمیل فاکتور"
-        subtitle={`${pendingPayment?.method === 'cash' ? fa.payment.cash : 'بدهی'} — ${getSubtotal().toLocaleString('fa-IR')} ${fa.common.toman}`}
+        subtitle={pendingPayment ? `${formatPaymentList(pendingPayment.payments)} — ${getSubtotal().toLocaleString('fa-IR')} ${fa.common.toman}` : ''}
         icon={<svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>}
         footer={<>
           <DialogButton variant="ghost" onClick={() => setPendingPayment(null)}>{fa.common.cancel}</DialogButton>
@@ -289,7 +307,7 @@ export default function SalesTerminal() {
             let html = ''
             if (customerName) html += `<div style="font-size:11pt;margin-bottom:4px"><strong>مشتری:</strong> ${customerName}</div>`
             html += `<div class="header-info"><span>شماره فاکتور: ${saleComplete.invoiceNumber}</span><span>تاریخ: ${formatJalaliDateTime(saleComplete.createdAt || '')}</span></div>`
-            html += `<div class="header-info"><span>صندوق دار: ${user?.name || ''}</span><span>نوع پرداخت: ${saleComplete.paymentMethod === 'cash' ? 'نقدی' : saleComplete.paymentMethod === 'card' ? 'کارتی' : 'بدهی'}</span></div>`
+            html += `<div class="header-info"><span>صندوق دار: ${user?.name || ''}</span><span>نوع پرداخت: ${formatSalePayments(saleComplete)}</span></div>`
             if (saleDesc) html += `<div style="padding:6px 8px;margin:4px 0;font-size:9pt;background:#f0f4f8;border-radius:4px;color:#333">${saleDesc}</div>`
             html += '<table><thead><tr><th>کالا</th><th>تعداد</th><th>قیمت واحد</th><th>جمع</th></tr></thead><tbody>'
             saleComplete.items?.forEach((item: any) => { html += `<tr><td>${item.productTitle}</td><td>${item.quantity}</td><td>${item.unitPrice.toLocaleString('fa-IR')}</td><td>${item.subtotal.toLocaleString('fa-IR')}</td></tr>` })
@@ -309,7 +327,7 @@ export default function SalesTerminal() {
               </div>
               <div className="rounded-xl p-3" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
                 <div className="text-[10px] mb-1" style={{ color: 'var(--text-secondary)' }}>{fa.receipt.method}</div>
-                <div className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{saleComplete.paymentMethod === 'cash' ? fa.payment.cash : saleComplete.paymentMethod === 'card' ? fa.payment.card : fa.payment.ledger}</div>
+                <div className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{formatSalePayments(saleComplete)}</div>
               </div>
               <div className="rounded-xl p-3" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
                 <div className="text-[10px] mb-1" style={{ color: 'var(--text-secondary)' }}>{fa.receipt.date}</div>
@@ -408,26 +426,13 @@ export default function SalesTerminal() {
             <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ backgroundColor: `${success}20`, color: success }}>{items.length} {fa.pos.items}</span>
           </div>
           <div className="text-3xl font-extrabold mb-3" style={{ color: success }}>{getSubtotal().toLocaleString('fa-IR')} <span className="text-sm font-bold">{fa.common.toman}</span></div>
-
-          <div className="flex items-center justify-between pt-3" style={{ borderTop: '1px solid var(--border-color)' }}>
-            <label className="text-xs font-bold cursor-pointer" style={{ color: 'var(--text-primary)' }}>
-              {fa.pos.fullAmount}
-            </label>
-            <button onClick={() => setFullyPaid(!fullyPaid)}
-              className="relative w-12 h-6 rounded-full transition-all duration-200"
-              style={{ backgroundColor: fullyPaid ? success : 'var(--bg-tertiary)', boxShadow: fullyPaid ? `0 2px 8px ${success}40` : 'none' }}>
-              <div className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-all duration-200"
-                style={{ left: fullyPaid ? '24px' : '2px' }} />
-            </button>
-          </div>
         </div>
 
         {/* Payment Panel */}
         <PaymentPanel
-          onPaymentComplete={handlePaymentComplete}
+          onPay={handlePay}
           selectedCustomer={selectedCustomer}
           onSelectCustomer={setSelectedCustomer}
-          fullyPaid={fullyPaid}
         />
 
         {/* Suspended Slots Grid */}

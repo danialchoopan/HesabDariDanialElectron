@@ -44,7 +44,8 @@ export const fa = {
   },
   payment: {
     cash: 'نقدی',
-    card: 'کارت بانکی',
+    card: 'کارت‌خوان',
+    cardToCard: 'کارت به کارت',
     ledger: 'بدهی',
     method: 'نحوه پرداخت',
     customerPays: 'مبلغ پرداختی مشتری',
@@ -55,6 +56,11 @@ export const fa = {
     selectCustomer: 'انتخاب مشتری',
     noCustomer: 'بدون مشتری',
     customer: 'مشتری',
+    splitPayment: 'پرداخت ترکیبی',
+    remaining: 'باقی‌مانده',
+    allocate: 'اختصاص مبلغ',
+    payNow: 'پرداخت',
+    toAccount: 'به حساب بدهی',
   },
   setup: {
     welcome: 'خوش آمدید!',

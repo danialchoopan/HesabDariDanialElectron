@@ -1,40 +1,45 @@
 /**
- * PaymentPanel — payment selection and customer search for the POS.
+ * PaymentPanel — payment method selection and split-payment entry for the POS.
  *
- * Displays:
- *   - Customer search with autocomplete dropdown
- *   - Payment method buttons: Cash, Card, Ledger (credit)
- *   - Quick-pay vs custom amount toggle
- *   - Change calculation for cash payments
- *   - Selected customer display with balance info
+ * A customer can settle an invoice with a SINGLE method (cash, card reader,
+ * card-to-card, or ledger/debt) or with a COMBINATION — e.g. part card-to-card
+ * and part added to the customer's debt. The panel lets you toggle any number
+ * of methods, type an amount for each, and shows the remaining amount that must
+ * be allocated. The invoice is only ready when the allocated total matches.
  *
- * When "ledger" is selected, the customer must be chosen first.
- * The panel communicates payment choices to the parent via callbacks.
+ * When "ledger" is toggled, a customer must be chosen first (the remainder is
+ * added to their account). Cash amounts may over-tender; the resulting change
+ * is shown.
  */
-
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useCartStore } from '../../store/cartStore'
-import type { Customer } from '../../../../types'
+import type { Customer, PaymentMethod, SalePayment } from '../../../../types'
 import { fa } from '../../i18n'
 import { MoneyIcon, BookIcon, SearchIcon, XIcon } from '../ui/Icons'
 import { formatNumberInput, parseFormattedNumber } from '../ui/FormattedPriceInput'
+import { paymentMethodLabel, paymentColor, normalizePayments } from '../../utils/payment'
 
-type PaymentMethod = 'cash' | 'card' | 'ledger'
+type PayMethod = PaymentMethod
 
 interface Props {
-  onPaymentComplete: (method: PaymentMethod, customerPaid?: number) => void
+  onPay: (payments: SalePayment[]) => void
   selectedCustomer: Customer | null
   onSelectCustomer: (c: Customer | null) => void
-  fullyPaid: boolean
 }
 
-export default function PaymentPanel({ onPaymentComplete, selectedCustomer, onSelectCustomer, fullyPaid }: Props) {
-  const totalAmount = useCartStore((s) => s.getSubtotal())
-  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(null)
-  const [paid, setPaid] = useState('')
-  const [customers, setCustomers] = useState<Customer[]>([])
+const METHODS: { key: PayMethod; icon: JSX.Element }[] = [
+  { key: 'cash', icon: <MoneyIcon className="w-5 h-5" /> },
+  { key: 'card', icon: <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg> },
+  { key: 'card_to_card', icon: <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 10l-3 2 3 2M17 14l3-2-3-2"/><path d="M4 12h8m0 0h8"/></svg> },
+  { key: 'ledger', icon: <BookIcon className="w-5 h-5" /> },
+]
+
+export default function PaymentPanel({ onPay, selectedCustomer, onSelectCustomer }: Props) {
+  const total = useCartStore((s) => s.getSubtotal())
+  const [amounts, setAmounts] = useState<Record<PayMethod, number>>({ cash: 0, card: 0, card_to_card: 0, ledger: 0 })
   const [showCustomerSearch, setShowCustomerSearch] = useState(false)
   const [customerQuery, setCustomerQuery] = useState('')
+  const [customers, setCustomers] = useState<Customer[]>([])
 
   useEffect(() => {
     if (showCustomerSearch) {
@@ -42,122 +47,136 @@ export default function PaymentPanel({ onPaymentComplete, selectedCustomer, onSe
     }
   }, [showCustomerSearch, customerQuery])
 
-  const paidAmount = fullyPaid ? totalAmount : (parseFloat(paid) || 0)
-  const change = Math.max(0, paidAmount - totalAmount)
+  const active = useMemo(() => METHODS.filter(m => (amounts[m.key] || 0) > 0), [amounts])
+  const allocated = active.reduce((s, m) => s + (amounts[m.key] || 0), 0)
+  const remaining = Math.max(0, total - allocated)
+  const ledgerAmount = amounts.ledger || 0
 
-  const methods: { key: PaymentMethod; label: string; icon: JSX.Element; color: string }[] = [
-    { key: 'cash', label: fa.payment.cash, icon: <MoneyIcon className="w-5 h-5" />, color: 'linear-gradient(135deg, #22c55e, #16a34a)' },
-    { key: 'ledger', label: fa.payment.ledger, icon: <BookIcon className="w-5 h-5" />, color: 'linear-gradient(135deg, #a855f7, #7c3aed)' },
-  ]
+  const setAmount = (m: PayMethod, v: number) => setAmounts(prev => ({ ...prev, [m]: v }))
+  const toggleOff = (m: PayMethod) => setAmounts(prev => ({ ...prev, [m]: 0 }))
+  const fillRemaining = (m: PayMethod) => {
+    if (m === 'ledger' && !selectedCustomer) return
+    const otherAllocated = active.filter(a => a.key !== m).reduce((s, x) => s + (amounts[x.key] || 0), 0)
+    const rem = Math.max(0, total - otherAllocated)
+    setAmounts(prev => ({ ...prev, [m]: rem }))
+  }
 
-  const quickAmounts = fullyPaid ? [] : [totalAmount, Math.ceil(totalAmount / 1000) * 1000, Math.ceil(totalAmount / 5000) * 5000, Math.ceil(totalAmount / 10000) * 10000].filter((v, i, a) => a.indexOf(v) === i)
+  const ready = remaining === 0 && allocated > 0 && (ledgerAmount === 0 || !!selectedCustomer)
+
+  const complete = () => {
+    if (!ready) return
+    const payments = normalizePayments(
+      METHODS.map(m => ({ method: m.key, amount: amounts[m.key] || 0 })),
+      total,
+    )
+    if (payments.length === 0) return
+    onPay(payments)
+  }
+
+  const canUseLedger = !!selectedCustomer
 
   return (
-    <div className="card">
-      <div className="text-center mb-3">
+    <div className="card space-y-2" style={{ overflowY: 'auto', maxHeight: '46vh' }}>
+      <div className="text-center">
         <span className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>{fa.pos.total}</span>
-        <div className="text-3xl font-bold text-green-400">{totalAmount.toLocaleString('fa-IR')} {fa.common.toman}</div>
+        <div className="text-2xl font-bold text-green-400">{total.toLocaleString('fa-IR')} {fa.common.toman}</div>
       </div>
 
-      {/* Customer Search - always visible */}
-      <div className="mb-3">
-        <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>{fa.payment.customer}</label>
+      {/* Customer */}
+      <div>
+        <label className="text-[10px] font-bold block mb-1" style={{ color: 'var(--text-secondary)' }}>{fa.payment.customer}</label>
         {selectedCustomer ? (
           <div className="flex justify-between items-center rounded-xl p-2" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{selectedCustomer.name}</span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold" style={{ backgroundColor: selectedCustomer.customerType === 'legal' ? 'rgba(168,85,247,0.15)' : 'rgba(59,130,246,0.15)', color: selectedCustomer.customerType === 'legal' ? '#a855f7' : '#3b82f6' }}>
-                {selectedCustomer.customerType === 'legal' ? 'حقوقی' : 'حقیقی'}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className={`text-xs font-bold ${selectedCustomer.balance < 0 ? 'text-red-400' : 'text-green-400'}`}>
-                {selectedCustomer.balance.toLocaleString('fa-IR')}
-              </span>
-              <button onClick={() => onSelectCustomer(null)} className="btn-danger" style={{ padding: '2px 6px', fontSize: '10px', borderRadius: '6px' }}>
-                <XIcon className="w-3 h-3" />
-              </button>
-            </div>
+            <span className="text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>{selectedCustomer.name}</span>
+            <button onClick={() => onSelectCustomer(null)} className="btn-danger" style={{ padding: '2px 6px', fontSize: '10px', borderRadius: '6px' }}>
+              <XIcon className="w-3 h-3" />
+            </button>
           </div>
         ) : (
-          <button onClick={() => setShowCustomerSearch(true)} className="w-full text-sm font-medium py-2 rounded-xl flex items-center justify-center gap-2 transition-all" style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px dashed var(--border-color)' }}>
-            <SearchIcon className="w-4 h-4" />
+          <button onClick={() => setShowCustomerSearch(true)} className="w-full text-xs font-medium py-1.5 rounded-xl flex items-center justify-center gap-2" style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px dashed var(--border-color)' }}>
+            <SearchIcon className="w-3.5 h-3.5" />
             {fa.payment.selectCustomer}
           </button>
+        )}
+        {ledgerAmount > 0 && !selectedCustomer && (
+          <p className="text-[10px] mt-1 font-bold" style={{ color: '#f59e0b' }}>برای بخش بدهی باید مشتری انتخاب شود</p>
         )}
       </div>
 
       {showCustomerSearch && (
-        <div className="rounded-xl p-3 mb-3" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
-          <div className="relative">
-            <SearchIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input value={customerQuery} onChange={(e) => setCustomerQuery(e.target.value)} className="input-field text-sm pl-8" placeholder={fa.customer.search} autoFocus />
-          </div>
-          <div className="max-h-32 overflow-auto space-y-1 mt-2">
+        <div className="rounded-xl p-2" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+          <input value={customerQuery} onChange={(e) => setCustomerQuery(e.target.value)} className="input-field text-xs w-full" placeholder={fa.customer.search} autoFocus />
+          <div className="max-h-28 overflow-auto space-y-1 mt-1">
             {customers.map((c) => (
-              <button key={c.id} onClick={() => { onSelectCustomer(c); setShowCustomerSearch(false); setCustomerQuery('') }} className="w-full text-right px-3 py-2 rounded-lg text-sm btn-primary flex justify-between" style={{ padding: '8px 12px' }}>
-                <span>{c.name}</span>
-                <span className="opacity-70 text-xs">{c.balance.toLocaleString('fa-IR')}</span>
+              <button key={c.id} onClick={() => { onSelectCustomer(c); setShowCustomerSearch(false); setCustomerQuery('') }}
+                className="w-full text-right px-2 py-1.5 rounded-lg text-xs btn-primary flex justify-between">
+                <span className="truncate">{c.name}</span>
+                <span className="opacity-70">{c.balance.toLocaleString('fa-IR')}</span>
               </button>
             ))}
           </div>
-          <button onClick={() => setShowCustomerSearch(false)} className="btn-danger mt-2 text-xs" style={{ padding: '4px 12px' }}>{fa.admin.cancel}</button>
+          <button onClick={() => setShowCustomerSearch(false)} className="btn-danger mt-1 text-[10px]" style={{ padding: '3px 10px' }}>{fa.admin.cancel}</button>
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-2 mb-3">
-        {methods.map((m) => (
-          <button key={m.key} onClick={() => { setSelectedMethod(m.key); if (!fullyPaid) setPaid('') }}
-            className="btn text-white rounded-xl p-3 flex flex-col items-center gap-1.5 transition-all"
-            style={{
-              background: selectedMethod === m.key ? m.color : 'var(--bg-tertiary)',
-              color: selectedMethod === m.key ? '#ffffff' : 'var(--text-secondary)',
-              transform: selectedMethod === m.key ? 'scale(1.05)' : 'scale(1)',
-              boxShadow: selectedMethod === m.key ? '0 4px 12px rgba(0,0,0,0.2)' : 'none',
-            }}>
-            {m.icon}
-            <span className="text-[10px] font-bold">{m.label}</span>
-          </button>
-        ))}
+      {/* Method toggles */}
+      <div className="grid grid-cols-2 gap-1.5">
+        {METHODS.map((m) => {
+          const on = (amounts[m.key] || 0) > 0
+          const color = paymentColor(m.key)
+          const disabled = m.key === 'ledger' && !canUseLedger
+          return (
+            <button key={m.key} onClick={() => {
+              if (on) { toggleOff(m.key); return }
+              // First method → pay the full amount (fast single-method flow);
+              // adding another method → fill whatever is still remaining.
+              if (allocated <= 0) setAmount(m.key, total)
+              else if (remaining > 0) setAmount(m.key, remaining)
+              else setAmount(m.key, 0)
+            }} disabled={disabled}
+              className="rounded-xl py-2 flex flex-col items-center gap-0.5 transition-all"
+              style={{
+                background: on ? color + '22' : 'var(--bg-tertiary)',
+                border: `1.5px solid ${on ? color : 'var(--border-color)'}`,
+                color: on ? color : 'var(--text-secondary)',
+                opacity: disabled ? 0.4 : 1,
+                cursor: disabled ? 'not-allowed' : 'pointer',
+              }}>
+              {m.icon}
+              <span className="text-[9px] font-bold">{paymentMethodLabel(m.key)}</span>
+            </button>
+          )
+        })}
       </div>
 
-      {selectedMethod === 'cash' && (
-        <div className="space-y-2">
-          {!fullyPaid && (
-            <>
-              <input type="text" inputMode="numeric" value={formatNumberInput(paid)} onChange={(e) => setPaid(String(parseFormattedNumber(e.target.value)))} className="input-field text-2xl text-center font-bold py-3" placeholder="0" autoFocus />
-              {quickAmounts.length > 0 && (
-                <div className="grid grid-cols-4 gap-1.5">
-                  {quickAmounts.map((amt) => (
-                    <button key={amt} onClick={() => setPaid(String(amt))} className="btn btn-primary text-[10px] py-2 rounded-lg">{amt.toLocaleString('fa-IR')}</button>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-          {fullyPaid && (
-            <div className="rounded-xl p-3 text-center" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
-              <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>{fa.pos.total}:</span>
-              <span className="text-lg font-bold text-green-400 mr-2">{totalAmount.toLocaleString('fa-IR')} {fa.common.toman}</span>
-            </div>
-          )}
-          {!fullyPaid && (
-            <div className="flex justify-between items-center rounded-xl p-3" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
-              <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>{fa.payment.change}</span>
-              <span className={`text-lg font-bold ${change > 0 ? 'text-yellow-400' : ''}`} style={change <= 0 ? { color: 'var(--text-muted)' } : {}}>
-                {change.toLocaleString('fa-IR')} {fa.common.toman}
-              </span>
-            </div>
-          )}
-          <button onClick={() => onPaymentComplete('cash', paidAmount)} disabled={totalAmount <= 0}
-            className="btn btn-success w-full text-lg py-3 disabled:opacity-40">{fa.payment.completeSale}</button>
+      {/* Amounts for active methods */}
+      {active.length > 0 && (
+        <div className="space-y-1.5 pt-1">
+          {active.map((m) => {
+            const color = paymentColor(m.key)
+            return (
+              <div key={m.key} className="flex items-center gap-1.5">
+                <span className="text-[10px] font-bold w-16 shrink-0" style={{ color }}>{paymentMethodLabel(m.key)}</span>
+                <input type="text" inputMode="numeric" value={amounts[m.key] ? formatNumberInput(String(amounts[m.key])) : ''}
+                  onChange={(e) => setAmount(m.key, parseFormattedNumber(e.target.value))}
+                  placeholder="0" className="input-field text-xs font-bold text-center flex-1 min-w-0" />
+                <button onClick={() => fillRemaining(m.key)} className="px-2 py-1 rounded-lg text-[10px] font-bold shrink-0"
+                  style={{ backgroundColor: color + '1a', color }}>{fa.payment.allocate}</button>
+                <button onClick={() => toggleOff(m.key)} className="shrink-0 text-xs" style={{ color: 'var(--text-muted)' }}>&times;</button>
+              </div>
+            )
+          })}
+          <div className="flex justify-between items-center pt-1" style={{ borderTop: '1px solid var(--border-color)' }}>
+            <span className="text-[10px] font-bold" style={{ color: 'var(--text-secondary)' }}>{fa.payment.remaining}</span>
+            <span className="text-sm font-bold" style={{ color: remaining > 0 ? '#f59e0b' : 'var(--text-primary)' }}>
+              {remaining.toLocaleString('fa-IR')} {fa.common.toman}
+            </span>
+          </div>
         </div>
       )}
 
-      {selectedMethod === 'ledger' && (
-        <button onClick={() => onPaymentComplete('ledger')} disabled={totalAmount <= 0 || !selectedCustomer}
-          className="btn btn-success w-full text-lg py-3 disabled:opacity-40">{fa.payment.addToLedger}</button>
-      )}
+      <button onClick={complete} disabled={!ready}
+        className="btn btn-success w-full py-3 text-base disabled:opacity-40">{fa.payment.completeSale}</button>
     </div>
   )
 }

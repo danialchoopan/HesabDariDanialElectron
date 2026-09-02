@@ -423,6 +423,86 @@ describe('Inventory math', () => {
   })
 })
 
+describe('Split / mixed payments', () => {
+  beforeEach(() => setRounding(0))
+
+  it('cash + card-to-card splits the journal across cash and bank', () => {
+    const sale = sales.createSale({
+      userId: 1, customerId: null,
+      items: [{ productId: 1, productTitle: 'Widget', quantity: 4, unitPrice: 500, purchasePrice: 300 }],
+      paymentMethod: 'cash',
+      payments: [{ method: 'cash', amount: 800 }, { method: 'card_to_card', amount: 1200 }],
+      customerPaid: 2000,
+      saleDate: '2026-07-05 12:00:00',
+    })
+    expect(sale.total_amount).toBe(2000)
+    expect(getAccountBalance('1100')).toBe(800)     // cash share
+    expect(getAccountBalance('1200')).toBe(1200)    // bank share (card_to_card)
+    expect(getAccountBalance('4100')).toBe(-2000)   // revenue full
+    expect(getAccountBalance('5100') + getAccountBalance('1300')).toBe(0) // cogs balanced with inventory
+    const rows = mockDb.prepare('SELECT method, amount FROM sale_payments').all() as { method: string; amount: number }[]
+    expect(rows.length).toBe(2)
+    expect(rows.find(r => r.method === 'cash')!.amount).toBe(800)
+    expect(rows.find(r => r.method === 'card_to_card')!.amount).toBe(1200)
+  })
+
+  it('cash + ledger adds only the ledger share to the customer debt', () => {
+    const sale = sales.createSale({
+      userId: 1, customerId: 1,
+      items: [{ productId: 1, productTitle: 'Widget', quantity: 4, unitPrice: 500, purchasePrice: 300 }],
+      paymentMethod: 'cash',
+      payments: [{ method: 'cash', amount: 500 }, { method: 'ledger', amount: 1500 }],
+      customerPaid: 500,
+      saleDate: '2026-07-05 12:00:00',
+    })
+    expect(sale.total_amount).toBe(2000)
+    const customer = mockDb.prepare('SELECT balance FROM customers WHERE id = 1').get()
+    expect(customer.balance).toBe(-1500)             // only the ledger part is debt
+    expect(getAccountBalance('1100')).toBe(500)
+    expect(getAccountBalance('1400')).toBe(1500)     // A/R = ledger share
+    expect(getAccountBalance('4100')).toBe(-2000)
+    const ledger = mockDb.prepare('SELECT * FROM customer_ledger WHERE customerId = 1').all() as any[]
+    expect(ledger.length).toBe(1)
+    expect(ledger[0].amount).toBe(1500)
+  })
+
+  it('pure card-to-card settles through the bank account', () => {
+    const sale = sales.createSale({
+      userId: 1, customerId: null,
+      items: [{ productId: 1, productTitle: 'Widget', quantity: 2, unitPrice: 500, purchasePrice: 300 }],
+      paymentMethod: 'cash',
+      payments: [{ method: 'card_to_card', amount: 1000 }],
+      customerPaid: 1000,
+      saleDate: '2026-07-05 12:00:00',
+    })
+    expect(sale.paymentMethod).toBe('card')          // summary falls back to card (bank)
+    expect(getAccountBalance('1200')).toBe(1000)
+    expect(getAccountBalance('1100')).toBe(0)
+    expect(getAccountBalance('1400')).toBe(0)
+  })
+
+  it('getDailySalesSummary honours the actual split, not just the primary method', () => {
+    sales.createSale({
+      userId: 1, customerId: null,
+      items: [{ productId: 1, productTitle: 'Widget', quantity: 1, unitPrice: 500, purchasePrice: 300 }],
+      paymentMethod: 'cash',
+      payments: [{ method: 'cash', amount: 300 }, { method: 'card', amount: 200 }],
+      customerPaid: 500, saleDate: '2026-07-05 12:00:00',
+    })
+    sales.createSale({
+      userId: 1, customerId: null,
+      items: [{ productId: 1, productTitle: 'Widget', quantity: 1, unitPrice: 1000, purchasePrice: 300 }],
+      paymentMethod: 'cash', customerPaid: 1000, saleDate: '2026-07-05 12:00:00',
+    })
+    const summary = sales.getDailySalesSummary('2026-07-05')
+    expect(summary.totalSales).toBe(1500)
+    expect(summary.transactionCount).toBe(2)
+    expect(summary.cashTotal).toBe(1300)             // 300 (split) + 1000 (cash-only)
+    expect(summary.cardTotal).toBe(200)              // the bank share of the split sale
+    expect(summary.ledgerTotal).toBe(0)
+  })
+})
+
 describe('Trial balance & general ledger', () => {
   it('trial balance reports debit/credit sums correctly', () => {
     sales.createSale({

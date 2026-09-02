@@ -54,7 +54,9 @@ export function createJournalEntry(data: {
 
 /**
  * Auto-posts a 4-line journal entry for a completed sale:
- *   Debit:  Receive account (cash=1100, bank=1200, or A/R=1400)
+ *   Debit:  Receive account(s) — cash=1100, bank=1200, A/R=1400. A sale may be
+ *           paid with a single method OR split across several (see paymentSplit
+ *           below), in which case each receive account is debited its share.
  *   Credit: Sales revenue (4100)
  *   Debit:  Cost of goods sold (5100)
  *   Credit: Inventory reduction (1300)
@@ -63,6 +65,8 @@ export function postSaleJournal(saleId: number, saleDate: string, data: {
   items: { purchasePrice: number; quantity: number }[]
   total_amount: number; paymentMethod: string
   affectsInventory?: boolean
+  /** Split settlement: cash/bank/AR shares. Sum must equal total_amount. */
+  paymentSplit?: { cash: number; bank: number; ar: number }
 }): void {
   const cashAcct = getAccountByCode('1100')
   const bankAcct = getAccountByCode('1200')
@@ -72,11 +76,17 @@ export function postSaleJournal(saleId: number, saleDate: string, data: {
     console.error('[Journal] Missing required account codes for sale journal'); return
   }
 
-  const receiveAccount = data.paymentMethod === 'cash' ? cashAcct : data.paymentMethod === 'card' ? bankAcct : arAcct
-  const lines: { accountId: number; debit: number; credit: number; description: string }[] = [
-    { accountId: receiveAccount.id, debit: data.total_amount, credit: 0, description: 'دریافت وجه' },
-    { accountId: salesAcct.id, debit: 0, credit: data.total_amount, description: 'درآمد فروش' },
-  ]
+  const lines: { accountId: number; debit: number; credit: number; description: string }[] = []
+
+  if (data.paymentSplit) {
+    if (data.paymentSplit.cash > 0) lines.push({ accountId: cashAcct.id, debit: data.paymentSplit.cash, credit: 0, description: 'دریافت نقدی' })
+    if (data.paymentSplit.bank > 0) lines.push({ accountId: bankAcct.id, debit: data.paymentSplit.bank, credit: 0, description: 'دریافت کارتی/کارت به کارت' })
+    if (data.paymentSplit.ar > 0) lines.push({ accountId: arAcct.id, debit: data.paymentSplit.ar, credit: 0, description: 'افزایش بدهی مشتری' })
+  } else {
+    const receiveAccount = data.paymentMethod === 'cash' ? cashAcct : data.paymentMethod === 'card' ? bankAcct : arAcct
+    lines.push({ accountId: receiveAccount.id, debit: data.total_amount, credit: 0, description: 'دریافت وجه' })
+  }
+  lines.push({ accountId: salesAcct.id, debit: 0, credit: data.total_amount, description: 'درآمد فروش' })
 
   // Only post COGS/inventory lines if inventory was affected
   if (data.affectsInventory !== false) {
