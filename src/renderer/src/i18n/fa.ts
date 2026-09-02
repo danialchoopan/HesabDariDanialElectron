@@ -46,6 +46,7 @@ export const fa = {
     cash: 'نقدی',
     card: 'کارت‌خوان',
     cardToCard: 'کارت به کارت',
+    online: 'آنلاین',
     ledger: 'بدهی',
     method: 'نحوه پرداخت',
     customerPays: 'مبلغ پرداختی مشتری',

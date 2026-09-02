@@ -481,6 +481,21 @@ describe('Split / mixed payments', () => {
     expect(getAccountBalance('1400')).toBe(0)
   })
 
+  it('online payment settles through the bank account and reports as bank', () => {
+    sales.createSale({
+      userId: 1, customerId: null,
+      items: [{ productId: 1, productTitle: 'Widget', quantity: 2, unitPrice: 500, purchasePrice: 300 }],
+      paymentMethod: 'cash',
+      payments: [{ method: 'online', amount: 1000 }],
+      customerPaid: 1000, saleDate: '2026-07-05 12:00:00',
+    })
+    expect(getAccountBalance('1200')).toBe(1000)
+    expect(getAccountBalance('1100')).toBe(0)
+    const summary = sales.getDailySalesSummary('2026-07-05')
+    expect(summary.cardTotal).toBe(1000)             // online is a bank channel
+    expect(summary.cashTotal).toBe(0)
+  })
+
   it('getDailySalesSummary honours the actual split, not just the primary method', () => {
     sales.createSale({
       userId: 1, customerId: null,

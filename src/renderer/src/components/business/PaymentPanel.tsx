@@ -29,11 +29,12 @@ interface Props {
   onWalkInNameChange?: (name: string) => void
 }
 
-const METHOD_KEYS: PayMethod[] = ['cash', 'card', 'card_to_card', 'ledger']
+const METHOD_KEYS: PayMethod[] = ['cash', 'card', 'card_to_card', 'online', 'ledger']
 const icons: Record<PayMethod, JSX.Element> = {
   cash: <MoneyIcon className="w-5 h-5" />,
   card: <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>,
   card_to_card: <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 10l-3 2 3 2M17 14l3-2-3-2"/><path d="M4 12h8m0 0h8"/></svg>,
+  online: <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>,
   ledger: <BookIcon className="w-5 h-5" />,
 }
 
@@ -42,7 +43,7 @@ export default function PaymentPanel({ onPay, selectedCustomer, onSelectCustomer
   const [mode, setMode] = useState<'single' | 'split'>('single')
   const [method, setMethod] = useState<PayMethod>('cash')
   const [cashTendered, setCashTendered] = useState('')
-  const [splitAmounts, setSplitAmounts] = useState<Record<PayMethod, number>>({ cash: 0, card: 0, card_to_card: 0, ledger: 0 })
+  const [splitAmounts, setSplitAmounts] = useState<Record<PayMethod, number>>({ cash: 0, card: 0, card_to_card: 0, online: 0, ledger: 0 })
   const [showCustomerSearch, setShowCustomerSearch] = useState(false)
   const [customerQuery, setCustomerQuery] = useState('')
   const [customers, setCustomers] = useState<Customer[]>([])

@@ -42,7 +42,7 @@ export function createSale(input: SaleInput): Sale {
   // PRIMARY channel for backwards compatibility; the exact split is stored in
   // sale_payments and drives the journal + customer balance.
   let cashTotal = 0
-  let bankTotal = 0 // card + card_to_card
+  let bankTotal = 0 // card + card_to_card + online
   let arTotal = 0   // ledger / added to debt
 
   if (input.payments && input.payments.length > 0) {
@@ -50,7 +50,7 @@ export function createSale(input: SaleInput): Sale {
       const amt = Math.round(p.amount)
       if (amt <= 0) continue
       if (p.method === 'cash') cashTotal += amt
-      else if (p.method === 'card' || p.method === 'card_to_card') bankTotal += amt
+      else if (p.method === 'card' || p.method === 'card_to_card' || p.method === 'online') bankTotal += amt
       else arTotal += amt
     }
     // Guard against a ledger share without a customer to attach the debt to.
@@ -101,7 +101,7 @@ export function createSale(input: SaleInput): Sale {
 
     // Record the payment split (one row per method actually used)
     const insertPayment = db.prepare('INSERT INTO sale_payments (saleId, method, amount) VALUES (?, ?, ?)')
-    const split: { method: 'cash' | 'card' | 'card_to_card' | 'ledger'; amount: number }[] = []
+    const split: { method: 'cash' | 'card' | 'card_to_card' | 'online' | 'ledger'; amount: number }[] = []
     if (input.payments && input.payments.length > 0) {
       for (const p of input.payments) {
         const amt = Math.round(p.amount)
@@ -201,10 +201,10 @@ export function getSaleById(id: number): Sale | undefined {
   }
 }
 
-function loadPayments(db: any, saleId: number): { method: 'cash' | 'card' | 'card_to_card' | 'ledger'; amount: number }[] {
+function loadPayments(db: any, saleId: number): { method: 'cash' | 'card' | 'card_to_card' | 'online' | 'ledger'; amount: number }[] {
   try {
     return (db.prepare('SELECT method, amount FROM sale_payments WHERE saleId = ? ORDER BY id').all(saleId) as { method: string; amount: number }[])
-      .map(r => ({ method: r.method as 'cash' | 'card' | 'card_to_card' | 'ledger', amount: r.amount }))
+      .map(r => ({ method: r.method as 'cash' | 'card' | 'card_to_card' | 'online' | 'ledger', amount: r.amount }))
   } catch {
     return []
   }
@@ -217,16 +217,16 @@ export function getSalesByDateRange(startDate: string, endDate: string): Sale[] 
   ).all(startDate, endDate) as Record<string, unknown>[]
 
   // Batch-load payment splits so we avoid an N+1 query per sale.
-  let paymentsBySale: Record<number, { method: 'cash' | 'card' | 'card_to_card' | 'ledger'; amount: number }[]> = {}
+  let paymentsBySale: Record<number, { method: 'cash' | 'card' | 'card_to_card' | 'online' | 'ledger'; amount: number }[]> = {}
   try {
     const ids = sales.map((s: any) => s.id)
     if (ids.length > 0) {
       const placeholders = ids.map(() => '?').join(',')
       const rows = db.prepare(`SELECT saleId, method, amount FROM sale_payments WHERE saleId IN (${placeholders}) ORDER BY id`).all(...ids) as { saleId: number; method: string; amount: number }[]
       paymentsBySale = rows.reduce((acc, r) => {
-        (acc[r.saleId] = acc[r.saleId] || []).push({ method: r.method as 'cash' | 'card' | 'card_to_card' | 'ledger', amount: r.amount })
+        (acc[r.saleId] = acc[r.saleId] || []).push({ method: r.method as 'cash' | 'card' | 'card_to_card' | 'online' | 'ledger', amount: r.amount })
         return acc
-      }, {} as Record<number, { method: 'cash' | 'card' | 'card_to_card' | 'ledger'; amount: number }[]>)
+      }, {} as Record<number, { method: 'cash' | 'card' | 'card_to_card' | 'online' | 'ledger'; amount: number }[]>)
     }
   } catch { /* table may not exist on very old DBs */ }
 
@@ -296,7 +296,7 @@ export function getDailySalesSummary(date: string): {
     totalSales: totals.totalSales,
     transactionCount: totals.transactionCount,
     cashTotal: byMethod['cash'] || 0,
-    cardTotal: (byMethod['card'] || 0) + (byMethod['card_to_card'] || 0),
+    cardTotal: (byMethod['card'] || 0) + (byMethod['card_to_card'] || 0) + (byMethod['online'] || 0),
     ledgerTotal: byMethod['ledger'] || 0,
   }
 }

@@ -46,6 +46,7 @@ export const en = {
     cash: 'Cash',
     card: 'Card Reader',
     cardToCard: 'Card to Card',
+    online: 'Online',
     ledger: 'Credit / Debt',
     method: 'Payment Method',
     customerPays: 'Customer Paid',

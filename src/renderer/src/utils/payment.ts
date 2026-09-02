@@ -9,7 +9,7 @@
 import { t } from '../i18n'
 import type { PaymentMethod, Sale, SalePayment } from '../../../types'
 
-const CHANNELS: PaymentMethod[] = ['cash', 'card', 'card_to_card', 'ledger']
+const CHANNELS: PaymentMethod[] = ['cash', 'card', 'card_to_card', 'online', 'ledger']
 
 export function paymentMethodLabel(method: PaymentMethod | string): string {
   const ui = t()
@@ -17,14 +17,15 @@ export function paymentMethodLabel(method: PaymentMethod | string): string {
     case 'cash': return ui.payment.cash
     case 'card': return ui.payment.card
     case 'card_to_card': return ui.payment.cardToCard
+    case 'online': return ui.payment.online
     case 'ledger': return ui.payment.ledger
     default: return String(method)
   }
 }
 
-/** Whether a payment method settles through the bank account (card / card-to-card). */
+/** Whether a payment method settles through the bank account (card / card-to-card / online). */
 export function isBankMethod(method: PaymentMethod | string): boolean {
-  return method === 'card' || method === 'card_to_card'
+  return method === 'card' || method === 'card_to_card' || method === 'online'
 }
 
 /**
@@ -66,6 +67,7 @@ export function paymentColor(method: PaymentMethod | string): string {
     case 'cash': return '#22c55e'
     case 'card': return '#3b82f6'
     case 'card_to_card': return '#06b6d4'
+    case 'online': return '#8b5cf6'
     case 'ledger': return '#a855f7'
     default: return '#64748b'
   }

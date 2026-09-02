@@ -256,7 +256,7 @@ function getSalesSummary(startDate: string, endDate: string) {
     ordersCount: row.ordersCount || 0,
     avgOrderValue: row.avgOrderValue || 0,
     cashSales: byMethod['cash'] || 0,
-    cardSales: (byMethod['card'] || 0) + (byMethod['card_to_card'] || 0),
+    cardSales: (byMethod['card'] || 0) + (byMethod['card_to_card'] || 0) + (byMethod['online'] || 0),
     ledgerSales: byMethod['ledger'] || 0,
   }
 }
